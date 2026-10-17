@@ -21,8 +21,8 @@ import com.linktoaudio.app.data.ConversionStateHolder
 import com.linktoaudio.app.data.VideoMetadata
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.MediaSaver
-import com.yausername.youtubedl.YoutubeDL
-import com.yausername.youtubedl.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -142,7 +142,7 @@ class ConversionForegroundService : Service() {
                     addOption("-o", "${tempDir.absolutePath}/%(title)s.%(ext)s")
                 }
 
-                YoutubeDL.getInstance().execute(request, { progress, etaInSeconds ->
+                YoutubeDL.getInstance().execute(request, processId) { progress, etaInSeconds, _ ->
                     if (!ConversionStateHolder.isCancelled) {
                         if (progress >= 100f) {
                             ConversionStateHolder.updateState(ConversionState.Converting(metadata))
@@ -168,7 +168,7 @@ class ConversionForegroundService : Service() {
                             )
                         }
                     }
-                }, processId)
+                }
 
                 if (ConversionStateHolder.isCancelled) return@launch
 

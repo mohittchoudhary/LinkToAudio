@@ -11,8 +11,8 @@ import com.linktoaudio.app.data.ConversionStateHolder
 import com.linktoaudio.app.service.ConversionForegroundService
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.UrlExtractor
-import com.yausername.youtubedl.YoutubeDL
-import com.yausername.youtubedl.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

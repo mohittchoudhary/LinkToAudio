@@ -1,6 +1,6 @@
 package com.linktoaudio.app.data
 
-import com.yausername.youtubedl.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -1,4 +1,5 @@
 # youtubedl-android Core
+-keep class com.yausername.youtubedl_android.** { *; }
 -keep class com.yausername.youtubedl.** { *; }
 -keep class io.github.junkfood02.youtubedl.** { *; }
 

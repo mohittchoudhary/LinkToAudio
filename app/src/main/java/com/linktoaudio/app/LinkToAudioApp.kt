@@ -3,8 +3,8 @@ package com.linktoaudio.app
 import android.app.Application
 import android.util.Log
 import com.yausername.ffmpeg.FFmpeg
-import com.yausername.youtubedl.YoutubeDL
-import com.yausername.youtubedl.YoutubeDLException
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 
 class LinkToAudioApp : Application() {
 
