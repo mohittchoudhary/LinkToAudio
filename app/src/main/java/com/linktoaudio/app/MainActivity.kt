@@ -111,7 +111,7 @@ fun MainAppScreen(
                 title = {
                     Text(
                         text = "LinkToAudio",
-                        style = MaterialTheme.colorScheme.titleLarge
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

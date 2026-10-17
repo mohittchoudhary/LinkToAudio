@@ -53,6 +53,7 @@ fun LinkToAudioTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
         content = content
     )
 }

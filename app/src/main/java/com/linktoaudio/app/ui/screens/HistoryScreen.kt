@@ -49,7 +49,7 @@ fun HistoryScreen(
         ) {
             Text(
                 text = "Converted Audio (${historyList.size})",
-                style = MaterialTheme.colorScheme.titleMedium,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
@@ -85,13 +85,13 @@ fun HistoryScreen(
                     )
                     Text(
                         text = "No audio conversions yet",
-                        style = MaterialTheme.colorScheme.titleSmall,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "Paste or share a YouTube/Instagram link from any app to convert and save audio here.",
-                        style = MaterialTheme.colorScheme.bodySmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -216,7 +216,7 @@ private fun HistoryItemCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.title,
-                        style = MaterialTheme.colorScheme.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -234,7 +234,7 @@ private fun HistoryItemCard(
                         ) {
                             Text(
                                 text = item.format,
-                                style = MaterialTheme.colorScheme.labelSmall,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -244,7 +244,7 @@ private fun HistoryItemCard(
                         if (item.durationSeconds > 0) {
                             Text(
                                 text = item.formattedDuration(),
-                                style = MaterialTheme.colorScheme.labelSmall,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -252,7 +252,7 @@ private fun HistoryItemCard(
                         if (item.fileSize > 0) {
                             Text(
                                 text = "• ${item.formattedSize()}",
-                                style = MaterialTheme.colorScheme.labelSmall,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -260,7 +260,7 @@ private fun HistoryItemCard(
 
                     Text(
                         text = formattedDate,
-                        style = MaterialTheme.colorScheme.labelSmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }

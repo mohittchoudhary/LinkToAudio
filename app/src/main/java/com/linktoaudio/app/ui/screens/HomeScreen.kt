@@ -72,7 +72,7 @@ fun HomeScreen(
                 )
                 Text(
                     text = "Only download content you own or have permission to use.",
-                    style = MaterialTheme.colorScheme.bodySmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -91,7 +91,7 @@ fun HomeScreen(
             ) {
                 Text(
                     text = "Video URL",
-                    style = MaterialTheme.colorScheme.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
 
@@ -168,7 +168,7 @@ fun HomeScreen(
                 ) {
                     Icon(Icons.Default.Audiotrack, contentDescription = "Convert")
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Convert to Audio", style = MaterialTheme.colorScheme.titleMedium)
+                    Text("Convert to Audio", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
@@ -301,7 +301,7 @@ private fun ActiveConversionCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = metadata.title,
-                            style = MaterialTheme.colorScheme.titleSmall,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -309,14 +309,14 @@ private fun ActiveConversionCard(
                         if (!metadata.uploader.isNullOrBlank()) {
                             Text(
                                 text = metadata.uploader,
-                                style = MaterialTheme.colorScheme.bodySmall,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                             )
                         }
                         if (metadata.durationSeconds > 0) {
                             Text(
                                 text = "Duration: ${metadata.formattedDuration()}",
-                                style = MaterialTheme.colorScheme.labelSmall,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -326,7 +326,7 @@ private fun ActiveConversionCard(
 
             Text(
                 text = stageTitle,
-                style = MaterialTheme.colorScheme.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
 
@@ -341,7 +341,7 @@ private fun ActiveConversionCard(
                 if (etaSeconds != null && etaSeconds > 0) {
                     Text(
                         text = "ETA: ${etaSeconds}s",
-                        style = MaterialTheme.colorScheme.bodySmall,
+                        style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.align(Alignment.End)
                     )
                 }
@@ -383,8 +383,8 @@ private fun ProgressCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(title, style = MaterialTheme.colorScheme.titleSmall, fontWeight = FontWeight.Bold)
-            Text(subtitle, style = MaterialTheme.colorScheme.bodySmall)
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
 
             if (progress != null) {
                 LinearProgressIndicator(
@@ -453,7 +453,7 @@ private fun SuccessCard(
                     )
                     Text(
                         text = "Audio Saved!",
-                        style = MaterialTheme.colorScheme.titleMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -492,19 +492,19 @@ private fun SuccessCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.title,
-                        style = MaterialTheme.colorScheme.bodyLarge,
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${item.format} • ${item.formattedDuration()} • ${item.formattedSize()}",
-                        style = MaterialTheme.colorScheme.bodySmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                     Text(
                         text = "Saved in Music/LinkToAudio",
-                        style = MaterialTheme.colorScheme.labelSmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -564,7 +564,7 @@ private fun ErrorCard(
                 )
                 Text(
                     text = "Conversion Failed",
-                    style = MaterialTheme.colorScheme.titleSmall,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -572,7 +572,7 @@ private fun ErrorCard(
 
             Text(
                 text = message,
-                style = MaterialTheme.colorScheme.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
 

@@ -12,7 +12,6 @@ import com.linktoaudio.app.service.ConversionForegroundService
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.UrlExtractor
 import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -149,11 +148,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshEngineVersion() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val req = YoutubeDLRequest().apply {
-                    addOption("--version")
-                }
-                val response = YoutubeDL.getInstance().execute(req)
-                val ver = response.out?.trim() ?: "Unknown"
+                val ver = YoutubeDL.getInstance().version(getApplication()) ?: "Ready"
                 _engineVersion.value = ver
             } catch (e: Exception) {
                 _engineVersion.value = "Ready"

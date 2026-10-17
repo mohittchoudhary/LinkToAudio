@@ -46,7 +46,7 @@ fun SettingsScreen(
             ) {
                 Text(
                     text = "Share Target Behavior",
-                    style = MaterialTheme.colorScheme.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -58,12 +58,12 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                         Text(
                             text = "Auto-convert on share",
-                            style = MaterialTheme.colorScheme.bodyLarge,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = "When shared from YouTube or Instagram, start converting to audio immediately without extra taps.",
-                            style = MaterialTheme.colorScheme.bodySmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -80,7 +80,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Default Audio Format",
-                        style = MaterialTheme.colorScheme.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -128,14 +128,14 @@ fun SettingsScreen(
                     )
                     Text(
                         text = "yt-dlp Engine",
-                        style = MaterialTheme.colorScheme.titleMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Text(
                     text = "Video platforms frequently change their internal video delivery APIs. If downloads fail or stall, update the on-device yt-dlp binary here.",
-                    style = MaterialTheme.colorScheme.bodySmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -146,7 +146,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "Engine version:",
-                        style = MaterialTheme.colorScheme.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium
                     )
                     Surface(
                         shape = RoundedCornerShape(6.dp),
@@ -154,7 +154,7 @@ fun SettingsScreen(
                     ) {
                         Text(
                             text = engineVersion ?: "Ready",
-                            style = MaterialTheme.colorScheme.labelMedium,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
@@ -169,7 +169,7 @@ fun SettingsScreen(
                     ) {
                         Text(
                             text = engineUpdateMessage!!,
-                            style = MaterialTheme.colorScheme.bodySmall,
+                            style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(10.dp)
                         )
                     }
@@ -211,7 +211,7 @@ fun SettingsScreen(
             ) {
                 Text(
                     text = "About LinkToAudio",
-                    style = MaterialTheme.colorScheme.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -220,7 +220,7 @@ fun SettingsScreen(
                             "• Output folder: Music/LinkToAudio (MediaStore)\n" +
                             "• Architecture: 100% on-device processing via yt-dlp & FFmpeg. No backend server required.\n" +
                             "• Disclaimer: Only download media you own or have explicit legal rights to extract.",
-                    style = MaterialTheme.colorScheme.bodySmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
