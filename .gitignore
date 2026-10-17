@@ -1,0 +1,18 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Built artifacts
+*.apk
+*.aab
+output.json
+
+# Keep Gradle Wrapper jar
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
