@@ -21,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
@@ -123,35 +125,43 @@ fun MainAppScreen(
         }
     }
 
+    val pendingChooserUrl by viewModel.pendingChooserUrl.collectAsState()
+    LaunchedEffect(pendingChooserUrl) {
+        if (pendingChooserUrl != null) {
+            selectedTab = NavTab.SETTINGS
+        }
+    }
+
     Scaffold(
-        topBar = {
-            if (selectedTab == NavTab.HOME) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "LinkToAudio",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-            }
-        },
         bottomBar = {
             Column {
                 MiniPlayer(
                     playerController = musicViewModel.playerController,
                     onExpand = { isNowPlayingOpen = true }
                 )
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
+                ) {
                     NavTab.values().forEach { tab ->
+                        val isSelected = selectedTab == tab
                         NavigationBarItem(
-                            selected = selectedTab == tab,
+                            selected = isSelected,
                             onClick = { selectedTab = tab },
                             icon = { Icon(tab.icon, contentDescription = tab.title) },
-                            label = { Text(tab.title) }
+                            label = {
+                                Text(
+                                    text = tab.title,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
                 }
@@ -166,10 +176,13 @@ fun MainAppScreen(
             color = MaterialTheme.colorScheme.background
         ) {
             when (selectedTab) {
-                NavTab.HOME -> HomeScreen(viewModel = viewModel)
+                NavTab.HOME -> HomeScreen(
+                    musicViewModel = musicViewModel,
+                    onNavigateToConverter = { selectedTab = NavTab.SETTINGS }
+                )
                 NavTab.LIBRARY -> LibraryScreen(
                     musicViewModel = musicViewModel,
-                    onNavigateToHome = { selectedTab = NavTab.HOME }
+                    onNavigateToHome = { selectedTab = NavTab.SETTINGS }
                 )
                 NavTab.SEARCH -> SearchScreen(musicViewModel = musicViewModel)
                 NavTab.SETTINGS -> SettingsScreen(viewModel = viewModel)

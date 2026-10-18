@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.linktoaudio.app.data.AudioFormat
 import com.linktoaudio.app.data.AudioQuality
+import com.linktoaudio.app.ui.components.LinkConverterSection
 import com.linktoaudio.app.viewmodel.MainViewModel
 
 @Composable
@@ -57,6 +58,17 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Link to audio converter section at the top
+        LinkConverterSection(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
+
         // Conversion Preferences Card
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -572,5 +584,7 @@ fun SettingsScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(90.dp))
     }
 }
