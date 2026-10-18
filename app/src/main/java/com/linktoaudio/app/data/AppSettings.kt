@@ -40,6 +40,10 @@ class AppSettings(context: Context) {
         MutableStateFlow(prefs.getBoolean(KEY_SCAN_ENTIRE_MUSIC_FOLDER, false))
     val scanEntireMusicFolderFlow: StateFlow<Boolean> = _scanEntireMusicFolderFlow.asStateFlow()
 
+    private val _defaultSleepTimerMinutesFlow =
+        MutableStateFlow(prefs.getInt(KEY_DEFAULT_SLEEP_TIMER_MINUTES, 0))
+    val defaultSleepTimerMinutesFlow: StateFlow<Int> = _defaultSleepTimerMinutesFlow.asStateFlow()
+
     var autoConvertOnShare: Boolean
         get() = prefs.getBoolean(KEY_AUTO_CONVERT_ON_SHARE, true)
         set(value) {
@@ -93,6 +97,13 @@ class AppSettings(context: Context) {
             _scanEntireMusicFolderFlow.value = value
         }
 
+    var defaultSleepTimerMinutes: Int
+        get() = prefs.getInt(KEY_DEFAULT_SLEEP_TIMER_MINUTES, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_DEFAULT_SLEEP_TIMER_MINUTES, value).apply()
+            _defaultSleepTimerMinutesFlow.value = value
+        }
+
     companion object {
         private const val PREFS_NAME = "link_to_audio_prefs"
         private const val KEY_AUTO_CONVERT_ON_SHARE = "key_auto_convert_on_share"
@@ -102,6 +113,7 @@ class AppSettings(context: Context) {
         private const val KEY_SPOTIFY_CLIENT_ID = "key_spotify_client_id"
         private const val KEY_SPOTIFY_CLIENT_SECRET = "key_spotify_client_secret"
         private const val KEY_SCAN_ENTIRE_MUSIC_FOLDER = "key_scan_entire_music_folder"
+        private const val KEY_DEFAULT_SLEEP_TIMER_MINUTES = "key_default_sleep_timer_minutes"
 
         @Volatile
         private var INSTANCE: AppSettings? = null

@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -23,10 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.linktoaudio.app.R
 import com.linktoaudio.app.player.model.*
 import com.linktoaudio.app.ui.components.CreatePlaylistDialog
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
@@ -36,12 +40,14 @@ import com.linktoaudio.app.viewmodel.MusicViewModel
 @Composable
 fun LibraryScreen(
     musicViewModel: MusicViewModel,
+    onNavigateToHome: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val currentTab by musicViewModel.currentTab.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
     val hasPermission by musicViewModel.hasStoragePermission.collectAsState()
+    val allSongs by musicViewModel.allSongs.collectAsState()
     val sortOption by musicViewModel.sortOption.collectAsState()
     val sortDirection by musicViewModel.sortDirection.collectAsState()
     val playlists by musicViewModel.playlists.collectAsState()
@@ -151,11 +157,12 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
                         text = "Storage Permission Required",
@@ -168,11 +175,25 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
-                    Button(
-                        onClick = { permissionLauncher.launch(permissionToRequest) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Grant Permission")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { permissionLauncher.launch(permissionToRequest) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Grant Permission")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = android.net.Uri.fromParts("package", context.packageName, null)
+                                }
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Text("App Settings")
+                        }
                     }
                 }
             }
@@ -184,6 +205,48 @@ fun LibraryScreen(
                 color = MaterialTheme.colorScheme.primary
             )
         }
+
+        if (hasPermission && !isRefreshing && allSongs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_default_album_art),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                    Text(
+                        text = "Your Library is empty",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Convert any link to audio on the Home tab to build your offline music collection.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onNavigateToHome,
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Download Music")
+                    }
+                }
+            }
+        } else {
 
         // Recently Downloaded Horizontal Row (Feature 12)
         if (recentlyDownloaded.isNotEmpty()) {
@@ -325,6 +388,7 @@ fun LibraryScreen(
             }
         }
     }
+}
 
     // Song 3-dot Menu Bottom Sheet
     activeMenuSong?.let { song ->
@@ -440,14 +504,16 @@ fun RecentlyDownloadedItem(
                         model = song.albumArtUri,
                         contentDescription = song.title,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.ic_default_album_art),
+                        placeholder = painterResource(id = R.drawable.ic_default_album_art)
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_default_album_art),
                         contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 }
             }
@@ -529,22 +595,19 @@ fun SongRowItem(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                error = painterResource(id = R.drawable.ic_default_album_art),
+                placeholder = painterResource(id = R.drawable.ic_default_album_art)
             )
         } else {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Image(
+                painter = painterResource(id = R.drawable.ic_default_album_art),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
         }
 
         Column(modifier = Modifier.weight(1f)) {
@@ -613,22 +676,19 @@ fun AlbumsListTab(
                             modifier = Modifier
                                 .size(52.dp)
                                 .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.ic_default_album_art),
+                            placeholder = painterResource(id = R.drawable.ic_default_album_art)
                         )
                     } else {
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Album,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_default_album_art),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
                     }
 
                     Column(modifier = Modifier.weight(1f)) {

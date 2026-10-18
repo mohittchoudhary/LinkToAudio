@@ -21,7 +21,8 @@ data class MusicPlayerData(
     val favorites: Set<Long> = emptySet(),
     val stats: Map<String, SongStats> = emptyMap(),
     val lastPlayedSongId: Long? = null,
-    val lastPlayedPositionMs: Long = 0L
+    val lastPlayedPositionMs: Long = 0L,
+    val recentSearches: List<String> = emptyList()
 )
 
 class MusicStorageManager private constructor(private val context: Context) {
@@ -46,6 +47,9 @@ class MusicStorageManager private constructor(private val context: Context) {
     private val _lastPlayedPositionFlow = MutableStateFlow(0L)
     val lastPlayedPositionFlow: StateFlow<Long> = _lastPlayedPositionFlow.asStateFlow()
 
+    private val _recentSearchesFlow = MutableStateFlow<List<String>>(emptyList())
+    val recentSearchesFlow: StateFlow<List<String>> = _recentSearchesFlow.asStateFlow()
+
     init {
         scope.launch {
             loadFromDisk()
@@ -68,6 +72,7 @@ class MusicStorageManager private constructor(private val context: Context) {
                         _songStatsFlow.value = mappedStats
                         _lastPlayedSongIdFlow.value = data.lastPlayedSongId
                         _lastPlayedPositionFlow.value = data.lastPlayedPositionMs
+                        _recentSearchesFlow.value = data.recentSearches
                     }
                 }
             } catch (e: Exception) {
@@ -84,7 +89,8 @@ class MusicStorageManager private constructor(private val context: Context) {
                 favorites = _favoritesFlow.value,
                 stats = statsForJson,
                 lastPlayedSongId = _lastPlayedSongIdFlow.value,
-                lastPlayedPositionMs = _lastPlayedPositionFlow.value
+                lastPlayedPositionMs = _lastPlayedPositionFlow.value,
+                recentSearches = _recentSearchesFlow.value
             )
             val json = gson.toJson(data)
             storageFile.writeText(json)
@@ -230,6 +236,36 @@ class MusicStorageManager private constructor(private val context: Context) {
         mutex.withLock {
             _lastPlayedSongIdFlow.value = songId
             _lastPlayedPositionFlow.value = positionMs
+            saveToDiskLocked()
+        }
+    }
+
+    suspend fun addRecentSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        mutex.withLock {
+            val current = _recentSearchesFlow.value.toMutableList()
+            current.removeAll { it.equals(trimmed, ignoreCase = true) }
+            current.add(0, trimmed)
+            val limited = current.take(10)
+            _recentSearchesFlow.value = limited
+            saveToDiskLocked()
+        }
+    }
+
+    suspend fun removeRecentSearch(query: String) {
+        val trimmed = query.trim()
+        mutex.withLock {
+            val current = _recentSearchesFlow.value.toMutableList()
+            current.removeAll { it.equals(trimmed, ignoreCase = true) }
+            _recentSearchesFlow.value = current
+            saveToDiskLocked()
+        }
+    }
+
+    suspend fun clearRecentSearches() {
+        mutex.withLock {
+            _recentSearchesFlow.value = emptyList()
             saveToDiskLocked()
         }
     }

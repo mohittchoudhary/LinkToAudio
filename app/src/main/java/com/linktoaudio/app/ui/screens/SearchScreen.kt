@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,10 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.linktoaudio.app.R
 import com.linktoaudio.app.player.model.Album
 import com.linktoaudio.app.player.model.Artist
 import com.linktoaudio.app.player.model.Playlist
@@ -38,6 +43,7 @@ fun SearchScreen(
     val searchAlbums by musicViewModel.searchResultsAlbums.collectAsState()
     val searchArtists by musicViewModel.searchResultsArtists.collectAsState()
     val searchPlaylists by musicViewModel.searchResultsPlaylists.collectAsState()
+    val recentSearches by musicViewModel.recentSearches.collectAsState()
     val favorites by musicViewModel.favorites.collectAsState()
     val playlists by musicViewModel.playlists.collectAsState()
     val allSongs by musicViewModel.allSongs.collectAsState()
@@ -73,6 +79,12 @@ fun SearchScreen(
                     }
                 }
             },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = {
+                if (searchQuery.isNotBlank()) {
+                    musicViewModel.addRecentSearch(searchQuery)
+                }
+            }),
             singleLine = true,
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier
@@ -81,6 +93,102 @@ fun SearchScreen(
         )
 
         if (searchQuery.isBlank()) {
+            if (recentSearches.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Recent Searches",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            TextButton(onClick = { musicViewModel.clearRecentSearches() }) {
+                                Text("Clear all", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+
+                    items(recentSearches) { term ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { musicViewModel.onSearchQueryChanged(term) }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = term,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { musicViewModel.removeRecentSearch(term) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ManageSearch,
+                            contentDescription = null,
+                            modifier = Modifier.size(72.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = "Search offline music",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Find tracks by song name, artist, album, or playlist title.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else if (searchSongs.isEmpty() && searchAlbums.isEmpty() && searchArtists.isEmpty() && searchPlaylists.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -92,35 +200,22 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ManageSearch,
+                        imageVector = Icons.Default.SearchOff,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        modifier = Modifier.size(56.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                     Text(
-                        text = "Search offline music",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "No results found for \"$searchQuery\"",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Find tracks by song name, artist, album, or playlist title.",
+                        text = "Check the spelling or try searching for another term.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        } else if (searchSongs.isEmpty() && searchAlbums.isEmpty() && searchArtists.isEmpty() && searchPlaylists.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No results found for \"$searchQuery\"",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         } else {
             LazyColumn(
@@ -136,6 +231,7 @@ fun SearchScreen(
                         SongRowItem(
                             song = song,
                             onClick = {
+                                musicViewModel.addRecentSearch(searchQuery)
                                 musicViewModel.playerController.playSong(song, searchSongs)
                             },
                             onMenuClick = { activeMenuSong = song }
@@ -152,7 +248,10 @@ fun SearchScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedAlbum = album }
+                                .clickable {
+                                    musicViewModel.addRecentSearch(searchQuery)
+                                    selectedAlbum = album
+                                }
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -172,13 +271,12 @@ fun SearchScreen(
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.surfaceVariant
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Album,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_default_album_art),
+                                        contentDescription = null,
+                                        tint = androidx.compose.ui.graphics.Color.Unspecified,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
                             }
 
@@ -209,7 +307,10 @@ fun SearchScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedArtist = artist }
+                                .clickable {
+                                    musicViewModel.addRecentSearch(searchQuery)
+                                    selectedArtist = artist
+                                }
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -253,7 +354,10 @@ fun SearchScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedPlaylist = pl }
+                                .clickable {
+                                    musicViewModel.addRecentSearch(searchQuery)
+                                    selectedPlaylist = pl
+                                }
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)

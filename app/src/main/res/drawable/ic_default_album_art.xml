@@ -1,0 +1,37 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+    <!-- Vinyl disc outer background -->
+    <path
+        android:fillColor="#242424"
+        android:pathData="M128,8 C61.7,8 8,61.7 8,128 C8,194.3 61.7,248 128,248 C194.3,248 248,194.3 248,128 C248,61.7 194.3,8 128,8 Z" />
+    <!-- Outer concentric groove -->
+    <path
+        android:strokeColor="#383838"
+        android:strokeWidth="3"
+        android:pathData="M128,34 C76.1,34 34,76.1 34,128 C34,179.9 76.1,222 128,222 C179.9,222 222,179.9 222,128 C222,76.1 179.9,34 128,34 Z" />
+    <!-- Middle groove -->
+    <path
+        android:strokeColor="#444444"
+        android:strokeWidth="2"
+        android:pathData="M128,64 C92.7,64 64,92.7 64,128 C64,163.3 92.7,192 128,192 C163.3,192 192,163.3 192,128 C192,92.7 163.3,64 128,64 Z" />
+    <!-- Inner groove -->
+    <path
+        android:strokeColor="#505050"
+        android:strokeWidth="2"
+        android:pathData="M128,82 C102.6,82 82,102.6 82,128 C82,153.4 102.6,174 128,174 C153.4,174 174,153.4 174,128 C174,102.6 153.4,82 128,82 Z" />
+    <!-- Center label -->
+    <path
+        android:fillColor="#1DB954"
+        android:pathData="M128,96 C110.3,96 96,110.3 96,128 C96,145.7 110.3,160 128,160 C145.7,160 160,145.7 160,128 C160,110.3 145.7,96 128,96 Z" />
+    <!-- Center hole -->
+    <path
+        android:fillColor="#121212"
+        android:pathData="M128,122 C124.7,122 122,124.7 122,128 C122,131.3 124.7,134 128,134 C131.3,134 134,131.3 134,128 C134,124.7 131.3,122 128,122 Z" />
+    <!-- Musical note symbol on label -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M134,110 L134,123.5 C132.8,122.9 131.5,122.5 130,122.5 C126.7,122.5 124,125.2 124,128.5 C124,131.8 126.7,134.5 130,134.5 C133.3,134.5 136,131.8 136,128.5 L136,114.5 L142,113 L142,108 Z" />
+</vector>

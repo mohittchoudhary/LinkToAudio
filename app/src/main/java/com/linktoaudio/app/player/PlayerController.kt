@@ -6,10 +6,12 @@ import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.linktoaudio.app.data.AppSettings
 import com.linktoaudio.app.player.data.MusicStorageManager
 import com.linktoaudio.app.player.model.PlayerRepeatMode
 import com.linktoaudio.app.player.model.Song
@@ -162,6 +164,22 @@ class PlayerController private constructor(private val context: Context) {
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 _playbackSpeed.value = playbackParameters.speed
             }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val failedSong = _currentSong.value
+                if (failedSong != null) {
+                    val currentList = _queue.value
+                    val failedIndex = currentList.indexOfFirst { it.id == failedSong.id }
+                    if (failedIndex >= 0) {
+                        removeFromQueue(failedIndex)
+                    }
+                    android.widget.Toast.makeText(
+                        context,
+                        "Skipping missing or unplayable track: ${failedSong.title}",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         })
     }
 
@@ -246,6 +264,22 @@ class PlayerController private constructor(private val context: Context) {
 
     fun playSong(song: Song, newQueue: List<Song> = listOf(song)) {
         val controller = mediaController ?: return
+
+        // Skip missing files and remove from queue
+        if (song.filePath.isNotBlank() && !java.io.File(song.filePath).exists()) {
+            val validQueue = newQueue.filter { it.id != song.id }
+            _queue.value = validQueue
+            android.widget.Toast.makeText(
+                context,
+                "File not found on device: ${song.title}",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            if (validQueue.isNotEmpty()) {
+                playSong(validQueue.first(), validQueue)
+            }
+            return
+        }
+
         val startIndex = newQueue.indexOfFirst { it.id == song.id }.let { if (it >= 0) it else 0 }
 
         _queue.value = newQueue
@@ -254,12 +288,26 @@ class PlayerController private constructor(private val context: Context) {
         _durationMs.value = song.durationMs
         _currentPositionMs.value = 0L
 
+        // Auto-apply default sleep timer if set and not already active
+        val defaultTimer = AppSettings.getInstance(context).defaultSleepTimerMinutes
+        if (_sleepTimerRemainingSec.value == null && !sleepAtEndOfTrack && defaultTimer != 0) {
+            if (defaultTimer == -1) {
+                startSleepTimerEndOfTheTrack()
+            } else if (defaultTimer > 0) {
+                startSleepTimer(defaultTimer)
+            }
+        }
+
         val mediaItems = newQueue.map { it.toMediaItem() }
         controller.stop()
         controller.clearMediaItems()
         controller.setMediaItems(mediaItems, startIndex, 0L)
         controller.prepare()
         controller.play()
+    }
+
+    fun getAudioSessionId(): Int {
+        return PlaybackService.audioSessionId
     }
 
     fun playQueue(songs: List<Song>, startIndex: Int = 0) {

@@ -16,15 +16,41 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = Cyan80,
-    tertiary = PurpleGrey80
+    primary = SpotifyGreen,
+    onPrimary = DarkBackground,
+    primaryContainer = SpotifyGreenContainer,
+    onPrimaryContainer = SpotifyGreenBright,
+    secondary = SpotifyGreenBright,
+    onSecondary = DarkBackground,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = DarkOnSurface,
+    surface = DarkSurface,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    background = DarkBackground,
+    onBackground = DarkOnSurface,
+    error = ErrorRed,
+    onError = DarkOnSurface
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = Cyan40,
-    tertiary = PurpleGrey40
+    primary = SpotifyGreenDark,
+    onPrimary = LightSurface,
+    primaryContainer = SpotifyGreenContainerLight,
+    onPrimaryContainer = SpotifyGreenDark,
+    secondary = SpotifyGreen,
+    onSecondary = LightSurface,
+    secondaryContainer = LightSurfaceVariant,
+    onSecondaryContainer = LightOnSurface,
+    surface = LightSurface,
+    onSurface = LightOnSurface,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    background = LightBackground,
+    onBackground = LightOnSurface,
+    error = ErrorRed,
+    onError = LightSurface
 )
 
 @Composable

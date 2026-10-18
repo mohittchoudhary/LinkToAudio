@@ -21,8 +21,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import com.linktoaudio.app.R
 import com.linktoaudio.app.player.PlayerController
 import com.linktoaudio.app.player.model.PlayerRepeatMode
 import com.linktoaudio.app.player.model.Song
@@ -85,6 +88,15 @@ fun NowPlayingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.08f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -132,13 +144,20 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Large Album Artwork
+            // Large Album Artwork with ambient styling
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (!song.albumArtUri.isNullOrBlank()) {
@@ -150,10 +169,12 @@ fun NowPlayingScreen(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Default.MusicNote,
+                        painter = painterResource(id = R.drawable.ic_default_album_art),
                         contentDescription = null,
-                        modifier = Modifier.size(110.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        tint = Color.Unspecified
                     )
                 }
             }

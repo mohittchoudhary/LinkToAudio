@@ -1,5 +1,11 @@
 package com.linktoaudio.app.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -25,6 +32,7 @@ fun SettingsScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val autoConvertOnShare by viewModel.autoConvertOnShare.collectAsState()
     val skipAlreadyDownloaded by viewModel.skipAlreadyDownloaded.collectAsState()
     val selectedFormat by viewModel.selectedFormat.collectAsState()
@@ -36,6 +44,7 @@ fun SettingsScreen(
     val spotifyClientId by viewModel.spotifyClientId.collectAsState()
     val spotifyClientSecret by viewModel.spotifyClientSecret.collectAsState()
     val scanEntireMusicFolder by viewModel.scanEntireMusicFolder.collectAsState()
+    val defaultSleepTimerMinutes by viewModel.defaultSleepTimerMinutes.collectAsState()
 
     var clientIdInput by remember(spotifyClientId) { mutableStateOf(spotifyClientId) }
     var clientSecretInput by remember(spotifyClientSecret) { mutableStateOf(spotifyClientSecret) }
@@ -265,7 +274,69 @@ fun SettingsScreen(
             }
         }
 
-        // Music Library Settings Card
+        // Background Activity / Battery Optimization Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.BatteryChargingFull,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Background Activity",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    text = "Ensure uninterrupted downloads and background audio playback by disabling battery restrictions for LinkToAudio.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            try {
+                                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                context.startActivity(intent)
+                            } catch (e2: Exception) {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                                context.startActivity(intent)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Manage Battery Optimization", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        // Music Player & Library Settings Card
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -276,38 +347,107 @@ fun SettingsScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = "Music Library",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 16.dp)
+                    Icon(
+                        Icons.Default.LibraryMusic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Music Player & Library",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Library source
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Library source",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Choose which audio files are scanned and indexed into your offline library.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Scan whole device Music folder",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold
+                        FilterChip(
+                            selected = !scanEntireMusicFolder,
+                            onClick = { viewModel.setScanEntireMusicFolder(false) },
+                            label = { Text("LinkToAudio Only", style = MaterialTheme.typography.labelMedium) },
+                            leadingIcon = if (!scanEntireMusicFolder) {
+                                {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null
                         )
-                        Text(
-                            text = "When turned off, the library only scans audio in Music/LinkToAudio. When turned on, all audio files across your device are included.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                        FilterChip(
+                            selected = scanEntireMusicFolder,
+                            onClick = { viewModel.setScanEntireMusicFolder(true) },
+                            label = { Text("Whole Device Music", style = MaterialTheme.typography.labelMedium) },
+                            leadingIcon = if (scanEntireMusicFolder) {
+                                {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null
                         )
                     }
+                }
 
-                    Switch(
-                        checked = scanEntireMusicFolder,
-                        onCheckedChange = { viewModel.setScanEntireMusicFolder(it) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Default sleep timer
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Default sleep timer",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
+                    Text(
+                        text = "Automatically set a sleep timer when playback starts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val timerOptions = listOf(
+                        0 to "Off",
+                        15 to "15m",
+                        30 to "30m",
+                        45 to "45m",
+                        60 to "60m",
+                        -1 to "End of track"
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        timerOptions.forEach { (minutes, label) ->
+                            FilterChip(
+                                selected = defaultSleepTimerMinutes == minutes,
+                                onClick = { viewModel.setDefaultSleepTimerMinutes(minutes) },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -56,6 +56,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val playlists = storageManager.playlistsFlow
     val favorites = storageManager.favoritesFlow
     val songStats = storageManager.songStatsFlow
+    val recentSearches = storageManager.recentSearchesFlow
 
     // Sorted and filtered songs for Library tab
     val displayedSongs: StateFlow<List<Song>> = combine(
@@ -325,14 +326,33 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openEqualizer(context: Context) {
         try {
+            val sessionId = playerController.getAudioSessionId()
             val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
                 putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
-                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, 0)
+                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, sessionId)
                 putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
             }
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun addRecentSearch(query: String) {
+        viewModelScope.launch {
+            storageManager.addRecentSearch(query)
+        }
+    }
+
+    fun removeRecentSearch(query: String) {
+        viewModelScope.launch {
+            storageManager.removeRecentSearch(query)
+        }
+    }
+
+    fun clearRecentSearches() {
+        viewModelScope.launch {
+            storageManager.clearRecentSearches()
         }
     }
 }

@@ -37,6 +37,13 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        exoPlayer.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onAudioSessionIdChanged(sessionId: Int) {
+                audioSessionId = sessionId
+            }
+        })
+        audioSessionId = exoPlayer.audioSessionId
+
         mediaSession = MediaSession.Builder(this, exoPlayer)
             .setSessionActivity(sessionActivity)
             .build()
@@ -54,11 +61,18 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        audioSessionId = 0
         mediaSession?.run {
             player.release()
             release()
             mediaSession = null
         }
         super.onDestroy()
+    }
+
+    companion object {
+        @Volatile
+        var audioSessionId: Int = 0
+            private set
     }
 }

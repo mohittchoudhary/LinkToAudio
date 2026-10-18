@@ -45,6 +45,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val spotifyClientId = appSettings.spotifyClientIdFlow
     val spotifyClientSecret = appSettings.spotifyClientSecretFlow
     val scanEntireMusicFolder = appSettings.scanEntireMusicFolderFlow
+    val defaultSleepTimerMinutes = appSettings.defaultSleepTimerMinutesFlow
 
     private val _playlistPreview = MutableStateFlow<PlaylistInfo?>(null)
     val playlistPreview: StateFlow<PlaylistInfo?> = _playlistPreview.asStateFlow()
@@ -104,6 +105,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setScanEntireMusicFolder(enabled: Boolean) {
         appSettings.scanEntireMusicFolder = enabled
+    }
+
+    fun setDefaultSleepTimerMinutes(minutes: Int) {
+        appSettings.defaultSleepTimerMinutes = minutes
     }
 
     fun onPaste(text: String?) {
