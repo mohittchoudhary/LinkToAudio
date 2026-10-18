@@ -44,6 +44,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val skipAlreadyDownloaded = appSettings.skipAlreadyDownloadedFlow
     val spotifyClientId = appSettings.spotifyClientIdFlow
     val spotifyClientSecret = appSettings.spotifyClientSecretFlow
+    val scanEntireMusicFolder = appSettings.scanEntireMusicFolderFlow
 
     private val _playlistPreview = MutableStateFlow<PlaylistInfo?>(null)
     val playlistPreview: StateFlow<PlaylistInfo?> = _playlistPreview.asStateFlow()
@@ -99,6 +100,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appSettings.spotifyClientId = clientId
         appSettings.spotifyClientSecret = clientSecret
         _snackbarMessage.value = "Spotify settings saved."
+    }
+
+    fun setScanEntireMusicFolder(enabled: Boolean) {
+        appSettings.scanEntireMusicFolder = enabled
     }
 
     fun onPaste(text: String?) {

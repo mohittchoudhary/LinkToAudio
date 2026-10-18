@@ -347,15 +347,32 @@ fun HomeScreen(
                         format = selectedFormat,
                         onPlay = {
                             try {
-                                val playIntent = MediaSaver.createPlayIntent(
-                                    context,
-                                    state.item.filePath,
-                                    state.item.contentUri,
-                                    selectedFormat
+                                val song = com.linktoaudio.app.player.model.Song(
+                                    id = state.item.id.hashCode().toLong(),
+                                    title = state.item.title,
+                                    artist = "LinkToAudio",
+                                    album = "Downloads",
+                                    durationMs = state.item.durationSeconds * 1000L,
+                                    contentUri = state.item.contentUri ?: android.net.Uri.fromFile(java.io.File(state.item.filePath)).toString(),
+                                    albumArtUri = state.item.thumbnail,
+                                    filePath = state.item.filePath,
+                                    dateAdded = state.item.timestamp / 1000L,
+                                    folder = "LinkToAudio",
+                                    sizeBytes = state.item.fileSize
                                 )
-                                context.startActivity(playIntent)
+                                com.linktoaudio.app.player.PlayerController.getInstance(context).playSong(song)
                             } catch (e: Exception) {
-                                Toast.makeText(context, "No audio player app found to play file", Toast.LENGTH_SHORT).show()
+                                try {
+                                    val playIntent = MediaSaver.createPlayIntent(
+                                        context,
+                                        state.item.filePath,
+                                        state.item.contentUri,
+                                        selectedFormat
+                                    )
+                                    context.startActivity(playIntent)
+                                } catch (ex: Exception) {
+                                    Toast.makeText(context, "No audio player found", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         onShare = {

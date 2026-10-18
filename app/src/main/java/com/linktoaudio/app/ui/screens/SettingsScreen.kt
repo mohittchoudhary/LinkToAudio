@@ -35,6 +35,7 @@ fun SettingsScreen(
 
     val spotifyClientId by viewModel.spotifyClientId.collectAsState()
     val spotifyClientSecret by viewModel.spotifyClientSecret.collectAsState()
+    val scanEntireMusicFolder by viewModel.scanEntireMusicFolder.collectAsState()
 
     var clientIdInput by remember(spotifyClientId) { mutableStateOf(spotifyClientId) }
     var clientSecretInput by remember(spotifyClientSecret) { mutableStateOf(spotifyClientSecret) }
@@ -260,6 +261,53 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Save Spotify Settings", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        // Music Library Settings Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "Music Library",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp)
+                    ) {
+                        Text(
+                            text = "Scan whole device Music folder",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "When turned off, the library only scans audio in Music/LinkToAudio. When turned on, all audio files across your device are included.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Switch(
+                        checked = scanEntireMusicFolder,
+                        onCheckedChange = { viewModel.setScanEntireMusicFolder(it) }
+                    )
                 }
             }
         }

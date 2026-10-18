@@ -36,6 +36,10 @@ class AppSettings(context: Context) {
         MutableStateFlow(prefs.getString(KEY_SPOTIFY_CLIENT_SECRET, "") ?: "")
     val spotifyClientSecretFlow: StateFlow<String> = _spotifyClientSecretFlow.asStateFlow()
 
+    private val _scanEntireMusicFolderFlow =
+        MutableStateFlow(prefs.getBoolean(KEY_SCAN_ENTIRE_MUSIC_FOLDER, false))
+    val scanEntireMusicFolderFlow: StateFlow<Boolean> = _scanEntireMusicFolderFlow.asStateFlow()
+
     var autoConvertOnShare: Boolean
         get() = prefs.getBoolean(KEY_AUTO_CONVERT_ON_SHARE, true)
         set(value) {
@@ -82,6 +86,13 @@ class AppSettings(context: Context) {
             _spotifyClientSecretFlow.value = value.trim()
         }
 
+    var scanEntireMusicFolder: Boolean
+        get() = prefs.getBoolean(KEY_SCAN_ENTIRE_MUSIC_FOLDER, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SCAN_ENTIRE_MUSIC_FOLDER, value).apply()
+            _scanEntireMusicFolderFlow.value = value
+        }
+
     companion object {
         private const val PREFS_NAME = "link_to_audio_prefs"
         private const val KEY_AUTO_CONVERT_ON_SHARE = "key_auto_convert_on_share"
@@ -90,6 +101,7 @@ class AppSettings(context: Context) {
         private const val KEY_SKIP_ALREADY_DOWNLOADED = "key_skip_already_downloaded"
         private const val KEY_SPOTIFY_CLIENT_ID = "key_spotify_client_id"
         private const val KEY_SPOTIFY_CLIENT_SECRET = "key_spotify_client_secret"
+        private const val KEY_SCAN_ENTIRE_MUSIC_FOLDER = "key_scan_entire_music_folder"
 
         @Volatile
         private var INSTANCE: AppSettings? = null
