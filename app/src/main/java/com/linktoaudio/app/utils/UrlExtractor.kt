@@ -11,8 +11,8 @@ object UrlExtractor {
     )
 
     /**
-     * Extracts the first valid URL from raw text (which may contain extra words/emojis).
-     * Returns null if no URL is found or if the URL does not belong to YouTube or Instagram.
+     * Extracts the first valid HTTP/HTTPS URL from raw text.
+     * Returns null if no valid URL is found.
      */
     fun extractFirstSupportedUrl(text: String?): String? {
         if (text.isNullOrBlank()) return null
@@ -21,7 +21,7 @@ object UrlExtractor {
         while (matcher.find()) {
             var candidate = matcher.group() ?: continue
             // Strip any trailing punctuation that may be part of surrounding sentence
-            candidate = candidate.trimEnd('.', ',', ';', '!', '?', ')', ']')
+            candidate = candidate.trimEnd('.', ',', ';', '!', '?', ')', ']', '"', '\'')
 
             if (isSupportedUrl(candidate)) {
                 return candidate
@@ -34,36 +34,49 @@ object UrlExtractor {
      * Extracts the first URL regardless of domain (used for friendly error reporting).
      */
     fun extractFirstAnyUrl(text: String?): String? {
-        if (text.isNullOrBlank()) return null
-        val matcher = URL_PATTERN.matcher(text)
-        if (matcher.find()) {
-            val candidate = matcher.group()
-            return candidate?.trimEnd('.', ',', ';', '!', '?', ')', ']')
-        }
-        return null
+        return extractFirstSupportedUrl(text)
     }
 
     /**
-     * Validates whether a URL is from YouTube or Instagram.
+     * Validates whether a URL is a valid HTTP or HTTPS web link.
      */
-    fun isSupportedUrl(url: String): Boolean {
+    fun isSupportedUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
         return try {
-            val host = URI(url).host?.lowercase() ?: return false
-            isYouTubeHost(host) || isInstagramHost(host)
+            val uri = URI(url.trim())
+            val scheme = uri.scheme?.lowercase()
+            (scheme == "http" || scheme == "https") && !uri.host.isNullOrBlank()
         } catch (e: Exception) {
             false
         }
     }
 
-    private fun isYouTubeHost(host: String): Boolean {
-        return host == "youtube.com" ||
-                host.endsWith(".youtube.com") ||
-                host == "youtu.be"
+    /**
+     * Checks if a URL is a Spotify link (open.spotify.com, spotify.link, or spotify.app.link).
+     */
+    fun isSpotifyUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        return try {
+            val host = URI(url.trim()).host?.lowercase() ?: return false
+            host == "open.spotify.com" ||
+                    host.endsWith(".spotify.com") ||
+                    host == "spotify.link" ||
+                    host.endsWith(".spotify.link") ||
+                    host == "spotify.app.link" ||
+                    host.endsWith(".spotify.app.link")
+        } catch (e: Exception) {
+            url.contains("spotify.com") || url.contains("spotify.link")
+        }
     }
 
-    private fun isInstagramHost(host: String): Boolean {
-        return host == "instagram.com" ||
-                host.endsWith(".instagram.com") ||
-                host == "instagr.am"
+    /**
+     * Checks if a URL is a single video that also carries a playlist parameter (e.g. YouTube watch?v=...&list=...).
+     */
+    fun hasVideoAndList(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val lower = url.lowercase()
+        val hasListParam = lower.contains("list=")
+        val hasVideoParam = (lower.contains("v=") || lower.contains("youtu.be/")) && !lower.contains("youtube.com/playlist")
+        return hasListParam && hasVideoParam
     }
 }

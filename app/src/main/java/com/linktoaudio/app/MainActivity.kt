@@ -72,6 +72,11 @@ class MainActivity : ComponentActivity() {
             if (!sharedText.isNullOrBlank()) {
                 viewModel.handleSharedContent(sharedText)
             }
+        } else if (Intent.ACTION_VIEW == intent.action) {
+            val dataString = intent.dataString
+            if (!dataString.isNullOrBlank()) {
+                viewModel.handleSharedContent(dataString)
+            }
         }
     }
 

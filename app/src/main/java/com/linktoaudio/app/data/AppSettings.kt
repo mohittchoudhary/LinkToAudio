@@ -19,6 +19,23 @@ class AppSettings(context: Context) {
     )
     val defaultFormatFlow: StateFlow<AudioFormat> = _defaultFormatFlow.asStateFlow()
 
+    private val _audioQualityFlow = MutableStateFlow(
+        AudioQuality.fromValue(prefs.getString(KEY_AUDIO_QUALITY, AudioQuality.BEST.value))
+    )
+    val audioQualityFlow: StateFlow<AudioQuality> = _audioQualityFlow.asStateFlow()
+
+    private val _skipAlreadyDownloadedFlow =
+        MutableStateFlow(prefs.getBoolean(KEY_SKIP_ALREADY_DOWNLOADED, false))
+    val skipAlreadyDownloadedFlow: StateFlow<Boolean> = _skipAlreadyDownloadedFlow.asStateFlow()
+
+    private val _spotifyClientIdFlow =
+        MutableStateFlow(prefs.getString(KEY_SPOTIFY_CLIENT_ID, "") ?: "")
+    val spotifyClientIdFlow: StateFlow<String> = _spotifyClientIdFlow.asStateFlow()
+
+    private val _spotifyClientSecretFlow =
+        MutableStateFlow(prefs.getString(KEY_SPOTIFY_CLIENT_SECRET, "") ?: "")
+    val spotifyClientSecretFlow: StateFlow<String> = _spotifyClientSecretFlow.asStateFlow()
+
     var autoConvertOnShare: Boolean
         get() = prefs.getBoolean(KEY_AUTO_CONVERT_ON_SHARE, true)
         set(value) {
@@ -35,10 +52,44 @@ class AppSettings(context: Context) {
             _defaultFormatFlow.value = value
         }
 
+    var audioQuality: AudioQuality
+        get() = AudioQuality.fromValue(
+            prefs.getString(KEY_AUDIO_QUALITY, AudioQuality.BEST.value)
+        )
+        set(value) {
+            prefs.edit().putString(KEY_AUDIO_QUALITY, value.value).apply()
+            _audioQualityFlow.value = value
+        }
+
+    var skipAlreadyDownloaded: Boolean
+        get() = prefs.getBoolean(KEY_SKIP_ALREADY_DOWNLOADED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SKIP_ALREADY_DOWNLOADED, value).apply()
+            _skipAlreadyDownloadedFlow.value = value
+        }
+
+    var spotifyClientId: String
+        get() = prefs.getString(KEY_SPOTIFY_CLIENT_ID, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_SPOTIFY_CLIENT_ID, value.trim()).apply()
+            _spotifyClientIdFlow.value = value.trim()
+        }
+
+    var spotifyClientSecret: String
+        get() = prefs.getString(KEY_SPOTIFY_CLIENT_SECRET, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_SPOTIFY_CLIENT_SECRET, value.trim()).apply()
+            _spotifyClientSecretFlow.value = value.trim()
+        }
+
     companion object {
         private const val PREFS_NAME = "link_to_audio_prefs"
         private const val KEY_AUTO_CONVERT_ON_SHARE = "key_auto_convert_on_share"
         private const val KEY_DEFAULT_FORMAT = "key_default_format"
+        private const val KEY_AUDIO_QUALITY = "key_audio_quality"
+        private const val KEY_SKIP_ALREADY_DOWNLOADED = "key_skip_already_downloaded"
+        private const val KEY_SPOTIFY_CLIENT_ID = "key_spotify_client_id"
+        private const val KEY_SPOTIFY_CLIENT_SECRET = "key_spotify_client_secret"
 
         @Volatile
         private var INSTANCE: AppSettings? = null

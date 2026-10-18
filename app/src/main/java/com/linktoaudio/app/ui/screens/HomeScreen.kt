@@ -4,6 +4,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import coil.compose.AsyncImage
 import com.linktoaudio.app.data.AudioFormat
 import com.linktoaudio.app.data.ConversionItem
 import com.linktoaudio.app.data.ConversionState
+import com.linktoaudio.app.data.PlaylistInfo
 import com.linktoaudio.app.data.VideoMetadata
 import com.linktoaudio.app.utils.MediaSaver
 import com.linktoaudio.app.viewmodel.MainViewModel
@@ -40,11 +42,51 @@ fun HomeScreen(
     val urlInput by viewModel.urlInput.collectAsState()
     val selectedFormat by viewModel.selectedFormat.collectAsState()
     val conversionState by viewModel.conversionState.collectAsState()
+    val playlistPreview by viewModel.playlistPreview.collectAsState()
+    val pendingChooserUrl by viewModel.pendingChooserUrl.collectAsState()
+    val isLoadingInfo by viewModel.isLoadingInfo.collectAsState()
+    val loadingMessage by viewModel.loadingMessage.collectAsState()
 
-    val isBusy = conversionState is ConversionState.FetchingInfo ||
+    val isBusy = isLoadingInfo ||
+            conversionState is ConversionState.FetchingInfo ||
             conversionState is ConversionState.Downloading ||
             conversionState is ConversionState.Converting ||
-            conversionState is ConversionState.Saving
+            conversionState is ConversionState.Saving ||
+            conversionState is ConversionState.QueueRunning
+
+    // Chooser dialog when a video inside a playlist is detected
+    if (pendingChooserUrl != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissChooser() },
+            icon = { Icon(Icons.Default.PlaylistPlay, contentDescription = null) },
+            title = {
+                Text(
+                    text = "Playlist Detected",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Text(
+                    text = "This link is a video inside a playlist: convert just this video or the whole playlist?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.onChooserChoice(justThisVideo = false) }
+                ) {
+                    Text("Whole playlist")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { viewModel.onChooserChoice(justThisVideo = true) }
+                ) {
+                    Text("Single video only")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -90,16 +132,43 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Video URL",
+                    text = "Paste any link",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+
+                // Supported Sources Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val sources = listOf("YouTube", "Spotify", "SoundCloud", "Instagram", "TikTok", "+ More")
+                    sources.forEach { source ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = source,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = urlInput,
                     onValueChange = { viewModel.onUrlChanged(it) },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Paste YouTube or Instagram link...") },
+                    placeholder = {
+                        Text(
+                            "Paste any link (YouTube, Spotify, SoundCloud...)",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
                     leadingIcon = {
                         Icon(Icons.Default.Link, contentDescription = "Link")
                     },
@@ -128,9 +197,13 @@ fun HomeScreen(
                         enabled = !isBusy,
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste", modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.ContentPaste,
+                            contentDescription = "Paste",
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Paste")
+                        Text("Paste", style = MaterialTheme.typography.labelLarge)
                     }
 
                     // Format Selection (MP3 / M4A)
@@ -142,7 +215,7 @@ fun HomeScreen(
                             FilterChip(
                                 selected = selectedFormat == format,
                                 onClick = { if (!isBusy) viewModel.onFormatSelected(format) },
-                                label = { Text(format.displayName) },
+                                label = { Text(format.displayName, style = MaterialTheme.typography.labelMedium) },
                                 enabled = !isBusy,
                                 leadingIcon = if (selectedFormat == format) {
                                     {
@@ -173,13 +246,51 @@ fun HomeScreen(
             }
         }
 
-        // Active State Cards (Fetching, Downloading, Converting, Saving, Done, Error)
+        // Loading Info Card (resolving redirects / inspecting playlist)
+        if (isLoadingInfo) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.5.dp
+                    )
+                    Text(
+                        text = loadingMessage ?: "Inspecting link...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
+        // Playlist Preview Screen / Card (when detected and not auto-converted)
+        if (playlistPreview != null) {
+            PlaylistPreviewCard(
+                playlist = playlistPreview!!,
+                onToggleTrack = { trackId -> viewModel.onTrackSelectionToggled(trackId) },
+                onSelectAll = { selectAll -> viewModel.selectAllTracks(selectAll) },
+                onConvert = { viewModel.convertSelectedPlaylist() },
+                onCancel = { viewModel.clearPlaylistPreview() }
+            )
+        }
+
+        // Active State Cards (Fetching, Downloading, Converting, Saving, QueueRunning, QueueCompleted, Done, Error)
         AnimatedVisibility(visible = conversionState !is ConversionState.Idle) {
             when (val state = conversionState) {
                 is ConversionState.FetchingInfo -> {
                     ProgressCard(
-                        title = "Fetching Video Details...",
-                        subtitle = "Contacting YouTube / Instagram engine",
+                        title = "Fetching Media Details...",
+                        subtitle = "Inspecting audio streams from source",
                         progress = null,
                         onCancel = { viewModel.cancelConversion() }
                     )
@@ -212,6 +323,20 @@ fun HomeScreen(
                         etaSeconds = null,
                         progress = null,
                         onCancel = { viewModel.cancelConversion() }
+                    )
+                }
+
+                is ConversionState.QueueRunning -> {
+                    QueueRunningCard(
+                        state = state,
+                        onCancel = { viewModel.cancelConversion() }
+                    )
+                }
+
+                is ConversionState.QueueCompleted -> {
+                    QueueCompletedCard(
+                        state = state,
+                        onDismiss = { viewModel.resetConversion() }
                     )
                 }
 
@@ -259,6 +384,299 @@ fun HomeScreen(
                 }
 
                 ConversionState.Idle -> {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistPreviewCard(
+    playlist: PlaylistInfo,
+    onToggleTrack: (String) -> Unit,
+    onSelectAll: (Boolean) -> Unit,
+    onConvert: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val totalTracks = playlist.tracks.size
+    val selectedCount = playlist.tracks.count { it.isSelected }
+    val allSelected = totalTracks > 0 && selectedCount == totalTracks
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = playlist.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "$totalTracks tracks ($selectedCount selected)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                TextButton(onClick = { onSelectAll(!allSelected) }) {
+                    Text(if (allSelected) "Select none" else "Select all", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+
+            // Spotify Note if applicable
+            if (playlist.isSpotify) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Audio is matched from YouTube, so it may differ slightly from the Spotify version. Private playlists are not supported.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Scrollable tracks list
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 280.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                playlist.tracks.forEach { track ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onToggleTrack(track.id) }
+                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = track.isSelected,
+                            onCheckedChange = { onToggleTrack(track.id) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = track.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            val subtitle = if (!track.artist.isNullOrBlank()) {
+                                "${track.artist} • ${track.formattedDuration()}"
+                            } else {
+                                track.formattedDuration()
+                            }
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Cancel", style = MaterialTheme.typography.labelLarge)
+                }
+
+                Button(
+                    onClick = onConvert,
+                    modifier = Modifier.weight(1f),
+                    enabled = selectedCount > 0,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Convert ($selectedCount)", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueRunningCard(
+    state: ConversionState.QueueRunning,
+    onCancel: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Track ${state.currentIndex} of ${state.totalCount}: ${state.currentTitle}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (!state.playlistTitle.isNullOrBlank()) {
+                Text(
+                    text = "Playlist: ${state.playlistTitle}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                )
+            }
+
+            // Track progress
+            LinearProgressIndicator(
+                progress = (state.progress / 100f).coerceIn(0f, 1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Overall: ${state.completedCount}/${state.totalCount} completed" +
+                            if (state.failedCount > 0) " (${state.failedCount} failed)" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+
+                if (state.etaSeconds > 0) {
+                    Text(
+                        text = "ETA: ${state.etaSeconds}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier.align(Alignment.End),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Cancel Queue", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueCompletedCard(
+    state: ConversionState.QueueCompleted,
+    onDismiss: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Playlist Download Finished",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+
+            Text(
+                text = "${state.completedCount} done, ${state.failedCount} failed",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+
+            Text(
+                text = "Saved to: ${state.destinationFolder}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            )
+
+            if (state.failedTitles.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Skipped / Failed tracks:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        state.failedTitles.forEach { failedTitle ->
+                            Text(
+                                text = "• $failedTitle",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Dismiss", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -361,7 +779,7 @@ private fun ActiveConversionCard(
             ) {
                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Cancel")
+                Text("Cancel", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -408,7 +826,7 @@ private fun ProgressCard(
                 modifier = Modifier.align(Alignment.End),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Cancel")
+                Text("Cancel", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -521,7 +939,7 @@ private fun SuccessCard(
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Play")
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Play")
+                    Text("Play", style = MaterialTheme.typography.labelLarge)
                 }
 
                 FilledTonalButton(
@@ -531,7 +949,7 @@ private fun SuccessCard(
                 ) {
                     Icon(Icons.Default.Share, contentDescription = "Share")
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Share")
+                    Text("Share", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -582,7 +1000,7 @@ private fun ErrorCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Dismiss", color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("Dismiss", color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.labelLarge)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -590,7 +1008,7 @@ private fun ErrorCard(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Retry")
+                    Text("Retry", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

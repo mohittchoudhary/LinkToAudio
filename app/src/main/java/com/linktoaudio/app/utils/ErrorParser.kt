@@ -52,7 +52,7 @@ object ErrorParser {
             lower.contains("unsupported url") ||
                     lower.contains("is not a valid url") ||
                     lower.contains("incomplete youtube id") -> {
-                "Invalid or unsupported link. Please share a valid YouTube or Instagram video link."
+                "Unsupported link. yt-dlp cannot extract audio from this URL. Please check the link."
             }
 
             lower.contains("cancelled") || lower.contains("interrupted") -> {

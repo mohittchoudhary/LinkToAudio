@@ -13,11 +13,14 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.linktoaudio.app.MainActivity
 import com.linktoaudio.app.R
+import com.linktoaudio.app.data.AppSettings
 import com.linktoaudio.app.data.AudioFormat
+import com.linktoaudio.app.data.AudioQuality
 import com.linktoaudio.app.data.ConversionHistoryManager
 import com.linktoaudio.app.data.ConversionItem
 import com.linktoaudio.app.data.ConversionState
 import com.linktoaudio.app.data.ConversionStateHolder
+import com.linktoaudio.app.data.PlaylistTrack
 import com.linktoaudio.app.data.VideoMetadata
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.MediaSaver
@@ -30,6 +33,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
+
+object ConversionQueueHolder {
+    @Volatile
+    var queueTracks: List<PlaylistTrack> = emptyList()
+
+    @Volatile
+    var playlistTitle: String? = null
+
+    @Volatile
+    var isSpotify: Boolean = false
+}
 
 class ConversionForegroundService : Service() {
 
@@ -50,11 +64,47 @@ class ConversionForegroundService : Service() {
             ACTION_START -> {
                 val url = intent.getStringExtra(EXTRA_URL)
                 val formatStr = intent.getStringExtra(EXTRA_FORMAT)
+                val qualityStr = intent.getStringExtra(EXTRA_QUALITY)
+                val title = intent.getStringExtra(EXTRA_TITLE)
+                val artist = intent.getStringExtra(EXTRA_ARTIST)
+                val isSpotify = intent.getBooleanExtra(EXTRA_IS_SPOTIFY, false)
+                val forceSingle = intent.getBooleanExtra(EXTRA_FORCE_SINGLE, true)
                 val format = AudioFormat.fromExtension(formatStr)
+                val quality = AudioQuality.fromValue(qualityStr)
+
                 if (!url.isNullOrBlank()) {
-                    startConversion(url, format)
+                    startSingleConversion(
+                        url = url,
+                        format = format,
+                        quality = quality,
+                        desiredTitle = title,
+                        artist = artist,
+                        isSpotify = isSpotify,
+                        forceSingleVideo = forceSingle
+                    )
                 }
             }
+
+            ACTION_START_QUEUE -> {
+                val formatStr = intent.getStringExtra(EXTRA_FORMAT)
+                val qualityStr = intent.getStringExtra(EXTRA_QUALITY)
+                val format = AudioFormat.fromExtension(formatStr)
+                val quality = AudioQuality.fromValue(qualityStr)
+                val tracks = ConversionQueueHolder.queueTracks
+                val playlistTitle = ConversionQueueHolder.playlistTitle
+                val isSpotify = ConversionQueueHolder.isSpotify
+
+                if (tracks.isNotEmpty()) {
+                    startQueueConversion(
+                        tracks = tracks,
+                        playlistTitle = playlistTitle,
+                        format = format,
+                        quality = quality,
+                        isSpotify = isSpotify
+                    )
+                }
+            }
+
             ACTION_CANCEL -> {
                 cancelConversion()
             }
@@ -62,26 +112,25 @@ class ConversionForegroundService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startConversion(url: String, format: AudioFormat) {
+    private fun startSingleConversion(
+        url: String,
+        format: AudioFormat,
+        quality: AudioQuality,
+        desiredTitle: String?,
+        artist: String?,
+        isSpotify: Boolean,
+        forceSingleVideo: Boolean
+    ) {
         conversionJob?.cancel()
 
-        // Start foreground immediately
         val initialNotification = buildProgressNotification(
             title = "Converting to ${format.displayName}",
-            content = "Fetching video details...",
+            content = "Fetching audio details...",
             progress = 0,
             isIndeterminate = true
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                initialNotification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, initialNotification)
-        }
+        promoteToForeground(initialNotification)
 
         conversionJob = serviceScope.launch {
             val processId = UUID.randomUUID().toString()
@@ -91,11 +140,9 @@ class ConversionForegroundService : Service() {
             val tempDir = File(cacheDir, "conversions").apply {
                 if (!exists()) mkdirs()
             }
-            // Clear prior temporary files in conversion cache
             tempDir.listFiles()?.forEach { it.delete() }
 
             try {
-                // Stage 1: Fetch Video Info
                 ConversionStateHolder.updateState(ConversionState.FetchingInfo(url))
                 updateNotification(
                     title = "Converting to ${format.displayName}",
@@ -104,28 +151,34 @@ class ConversionForegroundService : Service() {
                     isIndeterminate = true
                 )
 
-                val videoInfo = try {
-                    YoutubeDL.getInstance().getInfo(url)
-                } catch (e: Exception) {
-                    null
-                }
+                val videoInfo = if (!isSpotify) {
+                    try {
+                        YoutubeDL.getInstance().getInfo(url)
+                    } catch (e: Exception) {
+                        null
+                    }
+                } else null
 
                 if (ConversionStateHolder.isCancelled) return@launch
 
-                val videoTitle = videoInfo?.title ?: "Audio_${System.currentTimeMillis()}"
+                val resolvedTitle = when {
+                    !desiredTitle.isNullOrBlank() && !artist.isNullOrBlank() && isSpotify -> "$artist - $desiredTitle"
+                    !desiredTitle.isNullOrBlank() -> desiredTitle
+                    videoInfo?.title != null -> videoInfo.title
+                    else -> "Audio_${System.currentTimeMillis()}"
+                }
                 val duration = videoInfo?.duration?.toLong() ?: 0L
                 val thumbnail = videoInfo?.thumbnail
-                val uploader = videoInfo?.uploader
+                val uploader = artist ?: videoInfo?.uploader
 
                 val metadata = VideoMetadata(
-                    title = videoTitle,
+                    title = resolvedTitle,
                     durationSeconds = duration,
                     thumbnail = thumbnail,
                     uploader = uploader,
                     sourceUrl = url
                 )
 
-                // Stage 2: Download & Extract Audio using yt-dlp + ffmpeg
                 ConversionStateHolder.updateState(
                     ConversionState.Downloading(
                         progress = 0f,
@@ -134,15 +187,15 @@ class ConversionForegroundService : Service() {
                     )
                 )
 
-                val request = YoutubeDLRequest(url).apply {
-                    addOption("-x")
-                    addOption("--audio-format", format.extension)
-                    addOption("--audio-quality", "0")
-                    addOption("--no-playlist")
-                    addOption("-o", "${tempDir.absolutePath}/%(title)s.%(ext)s")
-                }
-
-                YoutubeDL.getInstance().execute(request, processId) { progress, etaInSeconds, _ ->
+                executeDownload(
+                    url = url,
+                    format = format,
+                    quality = quality,
+                    tempDir = tempDir,
+                    processId = processId,
+                    forceSingleVideo = forceSingleVideo,
+                    isSpotify = isSpotify
+                ) { progress, eta ->
                     if (!ConversionStateHolder.isCancelled) {
                         if (progress >= 100f) {
                             ConversionStateHolder.updateState(ConversionState.Converting(metadata))
@@ -156,13 +209,13 @@ class ConversionForegroundService : Service() {
                             ConversionStateHolder.updateState(
                                 ConversionState.Downloading(
                                     progress = progress,
-                                    etaSeconds = etaInSeconds,
+                                    etaSeconds = eta,
                                     metadata = metadata
                                 )
                             )
                             updateNotification(
                                 title = "Downloading Audio (${progress.toInt()}%)",
-                                content = "${metadata.title} - ETA: ${etaInSeconds}s",
+                                content = "${metadata.title} - ETA: ${eta}s",
                                 progress = progress.toInt(),
                                 isIndeterminate = false
                             )
@@ -172,7 +225,6 @@ class ConversionForegroundService : Service() {
 
                 if (ConversionStateHolder.isCancelled) return@launch
 
-                // Stage 3: Save to MediaStore (Music/LinkToAudio)
                 ConversionStateHolder.updateState(ConversionState.Saving(metadata))
                 updateNotification(
                     title = "Saving Audio",
@@ -189,7 +241,8 @@ class ConversionForegroundService : Service() {
                     context = applicationContext,
                     tempFile = generatedFile,
                     desiredTitle = metadata.title,
-                    format = format
+                    format = format,
+                    subfolder = null
                 )
 
                 val historyItem = ConversionItem(
@@ -205,13 +258,8 @@ class ConversionForegroundService : Service() {
                     fileSize = saveResult.size
                 )
 
-                // Save to persistent history
                 ConversionHistoryManager.getInstance(applicationContext).addItem(historyItem)
-
-                // Update UI state
                 ConversionStateHolder.updateState(ConversionState.Success(historyItem))
-
-                // Post completion notification
                 showCompletionNotification(historyItem, format)
 
             } catch (e: Exception) {
@@ -222,14 +270,248 @@ class ConversionForegroundService : Service() {
                     showErrorNotification(friendlyError)
                 }
             } finally {
-                // Clean temp directory
-                try {
-                    tempDir.listFiles()?.forEach { it.delete() }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                cleanupTemp(tempDir)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
+            }
+        }
+    }
+
+    private fun startQueueConversion(
+        tracks: List<PlaylistTrack>,
+        playlistTitle: String?,
+        format: AudioFormat,
+        quality: AudioQuality,
+        isSpotify: Boolean
+    ) {
+        conversionJob?.cancel()
+
+        val totalCount = tracks.size
+        val initialNotification = buildProgressNotification(
+            title = "Playlist: ${playlistTitle ?: "Downloading"}",
+            content = "Starting queue (0 of $totalCount)...",
+            progress = 0,
+            isIndeterminate = true
+        )
+
+        promoteToForeground(initialNotification)
+
+        conversionJob = serviceScope.launch {
+            val appSettings = AppSettings.getInstance(applicationContext)
+            val skipAlreadyDownloaded = appSettings.skipAlreadyDownloaded
+            val historyManager = ConversionHistoryManager.getInstance(applicationContext)
+
+            val tempDir = File(cacheDir, "conversions").apply {
+                if (!exists()) mkdirs()
+            }
+
+            var completedCount = 0
+            var failedCount = 0
+            val failedTitles = mutableListOf<String>()
+
+            ConversionStateHolder.isCancelled = false
+
+            for ((index, track) in tracks.withIndex()) {
+                if (ConversionStateHolder.isCancelled) break
+
+                val trackNumber = index + 1
+                val trackTitle = track.title
+                val artist = track.artist
+
+                // Check if already downloaded
+                if (skipAlreadyDownloaded && isTrackAlreadyDownloaded(historyManager, track)) {
+                    completedCount++
+                    continue
+                }
+
+                ConversionStateHolder.updateState(
+                    ConversionState.QueueRunning(
+                        currentIndex = trackNumber,
+                        totalCount = totalCount,
+                        currentTitle = trackTitle,
+                        progress = 0f,
+                        etaSeconds = 0L,
+                        playlistTitle = playlistTitle,
+                        completedCount = completedCount,
+                        failedCount = failedCount
+                    )
+                )
+
+                updateNotification(
+                    title = "Track $trackNumber of $totalCount: $trackTitle",
+                    content = "Overall: $completedCount/$totalCount done",
+                    progress = ((completedCount.toFloat() / totalCount) * 100).toInt(),
+                    isIndeterminate = true
+                )
+
+                val processId = UUID.randomUUID().toString()
+                ConversionStateHolder.currentProcessId = processId
+
+                // Clear tempDir before each track
+                tempDir.listFiles()?.forEach { it.delete() }
+
+                try {
+                    val resolvedTitle = if (isSpotify && !artist.isNullOrBlank()) {
+                        "$artist - $trackTitle"
+                    } else {
+                        trackTitle
+                    }
+
+                    executeDownload(
+                        url = track.url,
+                        format = format,
+                        quality = quality,
+                        tempDir = tempDir,
+                        processId = processId,
+                        forceSingleVideo = true,
+                        isSpotify = isSpotify
+                    ) { progress, eta ->
+                        if (!ConversionStateHolder.isCancelled) {
+                            ConversionStateHolder.updateState(
+                                ConversionState.QueueRunning(
+                                    currentIndex = trackNumber,
+                                    totalCount = totalCount,
+                                    currentTitle = trackTitle,
+                                    progress = progress,
+                                    etaSeconds = eta,
+                                    playlistTitle = playlistTitle,
+                                    completedCount = completedCount,
+                                    failedCount = failedCount
+                                )
+                            )
+
+                            val overallPct = (((completedCount.toFloat() + (progress / 100f)) / totalCount) * 100).toInt()
+                            updateNotification(
+                                title = "Track $trackNumber of $totalCount: $trackTitle",
+                                content = "${progress.toInt()}% • Overall: $completedCount/$totalCount done",
+                                progress = overallPct.coerceIn(0, 100),
+                                isIndeterminate = false
+                            )
+                        }
+                    }
+
+                    if (ConversionStateHolder.isCancelled) break
+
+                    val generatedFile = tempDir.listFiles()?.firstOrNull {
+                        it.extension.equals(format.extension, ignoreCase = true)
+                    } ?: throw IllegalStateException("Audio file not found for track: $trackTitle")
+
+                    val saveResult = MediaSaver.saveAudioFile(
+                        context = applicationContext,
+                        tempFile = generatedFile,
+                        desiredTitle = resolvedTitle,
+                        format = format,
+                        subfolder = playlistTitle
+                    )
+
+                    val historyItem = ConversionItem(
+                        id = UUID.randomUUID().toString(),
+                        title = resolvedTitle,
+                        sourceUrl = track.url,
+                        format = format.displayName,
+                        durationSeconds = track.durationSeconds,
+                        timestamp = System.currentTimeMillis(),
+                        filePath = saveResult.localFilePath,
+                        contentUri = saveResult.uri?.toString(),
+                        thumbnail = null,
+                        fileSize = saveResult.size
+                    )
+
+                    historyManager.addItem(historyItem)
+                    completedCount++
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    if (ConversionStateHolder.isCancelled) break
+                    failedCount++
+                    failedTitles.add(trackTitle)
+                } finally {
+                    tempDir.listFiles()?.forEach { it.delete() }
+                }
+            }
+
+            if (ConversionStateHolder.isCancelled) {
+                ConversionStateHolder.updateState(ConversionState.Error("Playlist conversion cancelled by user."))
+            } else {
+                val destFolder = if (!playlistTitle.isNullOrBlank()) {
+                    "Music/LinkToAudio/$playlistTitle"
+                } else {
+                    "Music/LinkToAudio"
+                }
+
+                ConversionStateHolder.updateState(
+                    ConversionState.QueueCompleted(
+                        completedCount = completedCount,
+                        failedCount = failedCount,
+                        failedTitles = failedTitles,
+                        playlistTitle = playlistTitle,
+                        destinationFolder = destFolder
+                    )
+                )
+
+                showQueueCompletionNotification(completedCount, failedCount, playlistTitle)
+            }
+
+            cleanupTemp(tempDir)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private fun isTrackAlreadyDownloaded(
+        historyManager: ConversionHistoryManager,
+        track: PlaylistTrack
+    ): Boolean {
+        val list = historyManager.historyFlow.value
+        return list.any { item ->
+            item.sourceUrl == track.url ||
+                    item.title.equals(track.title, ignoreCase = true) ||
+                    (track.artist != null && item.title.equals("${track.artist} - ${track.title}", ignoreCase = true))
+        }
+    }
+
+    private fun executeDownload(
+        url: String,
+        format: AudioFormat,
+        quality: AudioQuality,
+        tempDir: File,
+        processId: String,
+        forceSingleVideo: Boolean,
+        isSpotify: Boolean,
+        callback: (Float, Long) -> Unit
+    ) {
+        fun buildRequest(embedMetadata: Boolean, embedThumbnail: Boolean): YoutubeDLRequest {
+            return YoutubeDLRequest(url).apply {
+                addOption("-x")
+                addOption("--audio-format", format.extension)
+                addOption("--audio-quality", quality.value)
+                if (forceSingleVideo) {
+                    addOption("--no-playlist")
+                }
+                addOption("-o", "${tempDir.absolutePath}/%(title)s.%(ext)s")
+                if (embedMetadata) {
+                    addOption("--embed-metadata")
+                }
+                if (embedThumbnail) {
+                    addOption("--embed-thumbnail")
+                }
+            }
+        }
+
+        try {
+            val request = buildRequest(embedMetadata = isSpotify, embedThumbnail = isSpotify)
+            YoutubeDL.getInstance().execute(request, processId) { progress, eta, _ ->
+                callback(progress, eta)
+            }
+        } catch (e: Exception) {
+            if (isSpotify && !ConversionStateHolder.isCancelled) {
+                // Retry without embed-thumbnail/metadata in case FFmpeg or environment fails embedding
+                val retryRequest = buildRequest(embedMetadata = false, embedThumbnail = false)
+                YoutubeDL.getInstance().execute(retryRequest, processId) { progress, eta, _ ->
+                    callback(progress, eta)
+                }
+            } else {
+                throw e
             }
         }
     }
@@ -239,6 +521,18 @@ class ConversionForegroundService : Service() {
         conversionJob?.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun promoteToForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildProgressNotification(
@@ -314,6 +608,35 @@ class ConversionForegroundService : Service() {
         notificationManager.notify(NOTIFICATION_COMPLETE_ID, notification)
     }
 
+    private fun showQueueCompletionNotification(
+        completedCount: Int,
+        failedCount: Int,
+        playlistTitle: String?
+    ) {
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openAppPendingIntent = PendingIntent.getActivity(
+            this,
+            4,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = playlistTitle ?: "Playlist download"
+        val message = "$completedCount done, $failedCount failed"
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setAutoCancel(true)
+            .setContentIntent(openAppPendingIntent)
+            .build()
+
+        notificationManager.notify(NOTIFICATION_COMPLETE_ID, notification)
+    }
+
     private fun showErrorNotification(message: String) {
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -350,6 +673,14 @@ class ConversionForegroundService : Service() {
         }
     }
 
+    private fun cleanupTemp(tempDir: File) {
+        try {
+            tempDir.listFiles()?.forEach { it.delete() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
@@ -362,15 +693,64 @@ class ConversionForegroundService : Service() {
         const val NOTIFICATION_ERROR_ID = 1003
 
         const val ACTION_START = "com.linktoaudio.app.action.START"
+        const val ACTION_START_QUEUE = "com.linktoaudio.app.action.START_QUEUE"
         const val ACTION_CANCEL = "com.linktoaudio.app.action.CANCEL"
+
         const val EXTRA_URL = "extra_url"
         const val EXTRA_FORMAT = "extra_format"
+        const val EXTRA_QUALITY = "extra_quality"
+        const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_ARTIST = "extra_artist"
+        const val EXTRA_IS_SPOTIFY = "extra_is_spotify"
+        const val EXTRA_FORCE_SINGLE = "extra_force_single"
 
         fun start(context: Context, url: String, format: AudioFormat) {
+            startSingle(context, url, format, AudioQuality.BEST)
+        }
+
+        fun startSingle(
+            context: Context,
+            url: String,
+            format: AudioFormat,
+            quality: AudioQuality,
+            title: String? = null,
+            artist: String? = null,
+            isSpotify: Boolean = false,
+            forceSingleVideo: Boolean = true
+        ) {
             val intent = Intent(context, ConversionForegroundService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_URL, url)
                 putExtra(EXTRA_FORMAT, format.extension)
+                putExtra(EXTRA_QUALITY, quality.value)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+                putExtra(EXTRA_IS_SPOTIFY, isSpotify)
+                putExtra(EXTRA_FORCE_SINGLE, forceSingleVideo)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun startQueue(
+            context: Context,
+            tracks: List<PlaylistTrack>,
+            playlistTitle: String?,
+            format: AudioFormat,
+            quality: AudioQuality,
+            isSpotify: Boolean
+        ) {
+            ConversionQueueHolder.queueTracks = tracks
+            ConversionQueueHolder.playlistTitle = playlistTitle
+            ConversionQueueHolder.isSpotify = isSpotify
+
+            val intent = Intent(context, ConversionForegroundService::class.java).apply {
+                action = ACTION_START_QUEUE
+                putExtra(EXTRA_FORMAT, format.extension)
+                putExtra(EXTRA_QUALITY, quality.value)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)

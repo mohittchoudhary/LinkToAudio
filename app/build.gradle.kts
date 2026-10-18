@@ -87,6 +87,9 @@ dependencies {
     // JSON persistence for history & settings
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // HTTP client for Spotify embed & Web API
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // youtubedl-android & FFmpeg
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")

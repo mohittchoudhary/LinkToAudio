@@ -90,7 +90,7 @@ fun HistoryScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Paste or share a YouTube/Instagram link from any app to convert and save audio here.",
+                        text = "Paste or share any media link (YouTube, Spotify, SoundCloud, etc.) from any app to convert and save audio here.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center

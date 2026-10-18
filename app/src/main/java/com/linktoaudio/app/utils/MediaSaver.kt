@@ -24,27 +24,38 @@ object MediaSaver {
     )
 
     /**
-     * Saves a temporary audio file into Music/LinkToAudio via MediaStore (API 29+)
-     * or standard filesystem with MediaScanner (API <= 28).
+     * Saves a temporary audio file into Music/LinkToAudio or Music/LinkToAudio/<subfolder>
+     * via MediaStore (API 29+) or standard filesystem with MediaScanner (API <= 28).
      */
     fun saveAudioFile(
         context: Context,
         tempFile: File,
         desiredTitle: String,
-        format: AudioFormat
+        format: AudioFormat,
+        subfolder: String? = null
     ): SaveResult {
         val sanitizedTitle = sanitizeFilename(desiredTitle)
         val filename = "$sanitizedTitle.${format.extension}"
+        val sanitizedSubfolder = subfolder?.let { sanitizeFilename(it) }?.takeIf { it.isNotBlank() }
+
+        val relativePath = if (sanitizedSubfolder != null) {
+            "${Environment.DIRECTORY_MUSIC}/LinkToAudio/$sanitizedSubfolder"
+        } else {
+            "${Environment.DIRECTORY_MUSIC}/LinkToAudio"
+        }
+
+        val displayPath = if (sanitizedSubfolder != null) {
+            "Music/LinkToAudio/$sanitizedSubfolder/$filename"
+        } else {
+            "Music/LinkToAudio/$filename"
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, filename)
                 put(MediaStore.Audio.Media.TITLE, desiredTitle)
                 put(MediaStore.Audio.Media.MIME_TYPE, format.mimeType)
-                put(
-                    MediaStore.Audio.Media.RELATIVE_PATH,
-                    "${Environment.DIRECTORY_MUSIC}/LinkToAudio"
-                )
+                put(MediaStore.Audio.Media.RELATIVE_PATH, relativePath)
                 put(MediaStore.Audio.Media.IS_PENDING, 1)
             }
 
@@ -65,7 +76,7 @@ object MediaSaver {
 
                 return SaveResult(
                     uri = uri,
-                    displayPath = "Music/LinkToAudio/$filename",
+                    displayPath = displayPath,
                     localFilePath = tempFile.absolutePath,
                     size = tempFile.length()
                 )
@@ -77,8 +88,15 @@ object MediaSaver {
             // Legacy storage for API 24 - 28
             @Suppress("DEPRECATION")
             val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-            val appMusicDir = File(musicDir, "LinkToAudio").apply { if (!exists()) mkdirs() }
-            val destFile = File(appMusicDir, filename)
+            val parentDir = if (sanitizedSubfolder != null) {
+                File(File(musicDir, "LinkToAudio"), sanitizedSubfolder)
+            } else {
+                File(musicDir, "LinkToAudio")
+            }
+            if (!parentDir.exists()) {
+                parentDir.mkdirs()
+            }
+            val destFile = File(parentDir, filename)
 
             FileInputStream(tempFile).use { input ->
                 FileOutputStream(destFile).use { output ->

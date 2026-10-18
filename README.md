@@ -1,34 +1,41 @@
 # 🎵 LinkToAudio
 
-**LinkToAudio** is a native Android application built with Kotlin and Jetpack Compose (Material 3) that downloads and converts YouTube and Instagram videos directly into high-quality audio files (`.mp3` or `.m4a`) on your phone.
+**LinkToAudio** is a native Android application built with Kotlin and Jetpack Compose (Material 3) that downloads and converts any web link or playlist—including YouTube, Spotify, SoundCloud, Instagram, TikTok, Facebook, Twitter/X, Bandcamp, and Vimeo—directly into high-quality audio files (`.mp3` or `.m4a`) on your phone.
 
-Powered by `yt-dlp` and `ffmpeg` running entirely on-device via `youtubedl-android`, it requires **no backend server**, preserves privacy, and saves converted audio directly into your phone's standard `Music/LinkToAudio` directory.
+Powered by `yt-dlp` and `ffmpeg` running entirely on-device via `youtubedl-android`, it requires **no backend server**, preserves privacy, and saves converted audio directly into your phone's standard `Music/LinkToAudio` (and `Music/LinkToAudio/<Playlist>/`) directories.
 
 ---
 
 ## ✨ Features
 
+- **🌐 Universal Any-Link Support:**
+  - Converts audio from YouTube, Spotify, SoundCloud, Instagram, TikTok, Twitter/X, Facebook, Bandcamp, Vimeo, Dailymotion, and any platform supported by `yt-dlp`.
 - **⚡ Auto-Convert on Share (Core Feature):**
-  - Tap **Share** on any video in YouTube, Instagram, Chrome, or any app and select **LinkToAudio**.
-  - The app automatically extracts the link from the shared text, filters out surrounding captions or emojis, and **starts converting immediately with zero extra taps**.
-  - Runs in a background foreground service with a live progress notification.
-  - When finished, a notification alerts **"Audio saved"**—tap it to play the audio file immediately.
-- **🎛️ Audio Format Selection:** Choose between **MP3** (universal compatibility) and **M4A** (crisp AAC audio).
-- **📋 In-App Home Screen:**
-  - Paste button that reads your clipboard with one tap.
-  - Video info preview (thumbnail, title, uploader, duration).
-  - Real-time progress bar with percentage and stage description (Fetching info, Downloading, Converting with FFmpeg, Saving).
-  - Play and Share buttons once conversion completes.
+  - Tap **Share** on any link in any app and select **LinkToAudio**.
+  - The app automatically extracts the link and starts converting immediately with zero extra taps (when auto-convert on share is enabled).
+  - Background foreground service with a live progress notification.
+- **📑 Full Playlist & Album Support:**
+  - Detects playlists (YouTube, SoundCloud, Spotify albums/playlists, etc.) automatically.
+  - Interactive playlist screen: select/deselect tracks, "Select all / none", and convert chosen tracks.
+  - Sequential queue with progress indicators ("Track 3 of 25: Title").
+  - Saves playlists into dedicated folders (`Music/LinkToAudio/<Playlist Name>/`).
+  - Graceful error handling: skips failed/geo-blocked tracks and reports summary at completion.
+- **🎧 Spotify Links:**
+  - Resolves tracks, albums, and playlists via public embed pages without requiring user login.
+  - Matches and converts best audio stream via `ytsearch1:` on YouTube.
+  - Embeds metadata and cover art thumbnails.
+  - Optional Spotify Web API client-credentials fallback in Settings.
+- **🎛️ Audio Quality & Format Selection:**
+  - Choose audio quality: **Best**, **192 kbps**, or **128 kbps**.
+  - Formats: **MP3** (universal) and **M4A** (crisp AAC).
+- **⏭️ Skip Already Downloaded:**
+  - Optional toggle to skip tracks that already exist in your conversion history.
 - **📜 Conversion History:**
-  - Built-in history screen listing all past converted tracks.
-  - Play, share, or delete any track at any time.
+  - Built-in history screen listing all past converted tracks. Play, share, or delete any track at any time.
 - **🔄 On-Device Engine Updater:**
-  - A dedicated **"Update Engine"** button in Settings that fetches the latest `yt-dlp` release directly to the phone so your app never stops working when platforms change their APIs.
-- **⚙️ Settings:**
-  - Toggle **"Auto-convert on share"** on or off (if off, it pre-fills the URL field without auto-starting).
-  - Set default audio format (MP3 / M4A).
+  - A dedicated **"Update Engine"** button in Settings that fetches the latest `yt-dlp` release directly to the phone.
 - **🛡️ Clean & Compliant Storage:**
-  - Uses modern Android MediaStore API for Android 10+ (API 29–34), saving into `Music/LinkToAudio`. No legacy storage permissions needed on modern Android.
+  - Uses modern Android MediaStore API (API 29–34), saving into `Music/LinkToAudio` and playlist subfolders.
 
 ---
 
