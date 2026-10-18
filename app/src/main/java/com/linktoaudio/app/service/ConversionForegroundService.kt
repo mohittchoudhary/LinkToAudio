@@ -161,11 +161,15 @@ class ConversionForegroundService : Service() {
 
                 if (ConversionStateHolder.isCancelled) return@launch
 
-                val resolvedTitle = when {
-                    !desiredTitle.isNullOrBlank() && !artist.isNullOrBlank() && isSpotify -> "$artist - $desiredTitle"
-                    !desiredTitle.isNullOrBlank() -> desiredTitle
-                    videoInfo?.title != null -> videoInfo.title
-                    else -> "Audio_${System.currentTimeMillis()}"
+                val fallbackTitle = "Audio_${System.currentTimeMillis()}"
+                val rawTitle: String = desiredTitle?.takeIf { it.isNotBlank() }
+                    ?: videoInfo?.title?.takeIf { it.isNotBlank() }
+                    ?: fallbackTitle
+
+                val resolvedTitle: String = if (isSpotify && !artist.isNullOrBlank() && !desiredTitle.isNullOrBlank()) {
+                    "$artist - $rawTitle"
+                } else {
+                    rawTitle
                 }
                 val duration = videoInfo?.duration?.toLong() ?: 0L
                 val thumbnail = videoInfo?.thumbnail
@@ -315,8 +319,15 @@ class ConversionForegroundService : Service() {
                 if (ConversionStateHolder.isCancelled) break
 
                 val trackNumber = index + 1
-                val trackTitle = track.title
+                val trackTitle = track.title.ifBlank { "Track $trackNumber" }
                 val artist = track.artist
+
+                // Skip track if URL is blank
+                if (track.url.isBlank()) {
+                    failedCount++
+                    failedTitles.add(trackTitle)
+                    continue
+                }
 
                 // Check if already downloaded
                 if (skipAlreadyDownloaded && isTrackAlreadyDownloaded(historyManager, track)) {
@@ -351,7 +362,7 @@ class ConversionForegroundService : Service() {
                 tempDir.listFiles()?.forEach { it.delete() }
 
                 try {
-                    val resolvedTitle = if (isSpotify && !artist.isNullOrBlank()) {
+                    val resolvedTitle: String = if (isSpotify && !artist.isNullOrBlank()) {
                         "$artist - $trackTitle"
                     } else {
                         trackTitle

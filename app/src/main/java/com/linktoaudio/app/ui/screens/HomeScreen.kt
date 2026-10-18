@@ -274,9 +274,10 @@ fun HomeScreen(
         }
 
         // Playlist Preview Screen / Card (when detected and not auto-converted)
-        if (playlistPreview != null) {
+        val preview = playlistPreview
+        if (preview != null) {
             PlaylistPreviewCard(
-                playlist = playlistPreview!!,
+                playlist = preview,
                 onToggleTrack = { trackId -> viewModel.onTrackSelectionToggled(trackId) },
                 onSelectAll = { selectAll -> viewModel.selectAllTracks(selectAll) },
                 onConvert = { viewModel.convertSelectedPlaylist() },

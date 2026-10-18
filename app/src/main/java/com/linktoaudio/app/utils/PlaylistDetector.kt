@@ -30,15 +30,15 @@ object PlaylistDetector {
 
             val playlistTitle = json.optString("title").ifEmpty {
                 json.optString("playlist_title", "Playlist")
-            }
+            }.ifEmpty { "Playlist" }
 
             val tracks = mutableListOf<PlaylistTrack>()
             for (i in 0 until entriesArray.length()) {
                 val entry = entriesArray.optJSONObject(i) ?: continue
-                val trackTitle = entry.optString("title", "Track ${i + 1}")
+                val trackTitle = entry.optString("title", "Track ${i + 1}").ifEmpty { "Track ${i + 1}" }
                 val uploader = entry.optString("uploader").ifEmpty {
-                    entry.optString("channel", null)
-                }
+                    entry.optString("channel", "")
+                }.takeIf { it.isNotBlank() }
                 val durationSec = entry.optLong("duration", 0L)
 
                 var entryUrl = entry.optString("url")
@@ -51,10 +51,12 @@ object PlaylistDetector {
                         entryUrl = if (id.isNotBlank()) {
                             "https://www.youtube.com/watch?v=$id"
                         } else {
-                            url
+                            ""
                         }
                     }
                 }
+
+                if (entryUrl.isBlank()) continue
 
                 tracks.add(
                     PlaylistTrack(
