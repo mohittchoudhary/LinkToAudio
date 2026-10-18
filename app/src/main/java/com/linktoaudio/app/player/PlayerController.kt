@@ -3,7 +3,9 @@ package com.linktoaudio.app.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.core.content.ContextCompat
+import java.io.File
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -173,10 +175,10 @@ class PlayerController private constructor(private val context: Context) {
                     if (failedIndex >= 0) {
                         removeFromQueue(failedIndex)
                     }
-                    android.widget.Toast.makeText(
+                    Toast.makeText(
                         context,
                         "Skipping missing or unplayable track: ${failedSong.title}",
-                        android.widget.Toast.LENGTH_SHORT
+                        Toast.LENGTH_SHORT
                     ).show()
                 }
             }
@@ -266,13 +268,13 @@ class PlayerController private constructor(private val context: Context) {
         val controller = mediaController ?: return
 
         // Skip missing files and remove from queue
-        if (song.filePath.isNotBlank() && !java.io.File(song.filePath).exists()) {
+        if (song.filePath.isNotBlank() && !File(song.filePath).exists()) {
             val validQueue = newQueue.filter { it.id != song.id }
             _queue.value = validQueue
-            android.widget.Toast.makeText(
+            Toast.makeText(
                 context,
                 "File not found on device: ${song.title}",
-                android.widget.Toast.LENGTH_SHORT
+                Toast.LENGTH_SHORT
             ).show()
             if (validQueue.isNotEmpty()) {
                 playSong(validQueue.first(), validQueue)
