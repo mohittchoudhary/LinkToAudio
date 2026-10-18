@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
+import com.linktoaudio.app.auth.data.UserProfile
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.theme.SpotifyGreen
@@ -41,6 +42,7 @@ import java.util.Calendar
 @Composable
 fun HomeScreen(
     musicViewModel: MusicViewModel,
+    userProfile: UserProfile? = null,
     onNavigateToConverter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -88,7 +90,7 @@ fun HomeScreen(
         }
     }
 
-    val userName = remember {
+    val fallbackDeviceName = remember {
         try {
             val name = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
             if (!name.isNullOrBlank() && name != "Android" && name != "unknown") name else null
@@ -96,7 +98,9 @@ fun HomeScreen(
             null
         }
     }
-    val greetingText = if (!userName.isNullOrBlank()) "$greeting, $userName" else greeting
+
+    val displayName = userProfile?.name?.takeIf { it.isNotBlank() } ?: fallbackDeviceName
+    val greetingText = if (!displayName.isNullOrBlank()) "$greeting, $displayName" else greeting
 
     // Quick picks candidates: recently played, or fallback to all songs (recently added)
     val quickPickCandidates = remember(recentlyPlayed, allSongs) {
@@ -135,14 +139,25 @@ fun HomeScreen(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(
+                        if (userProfile?.isAdmin == true) SpotifyGreen else MaterialTheme.colorScheme.surfaceVariant
+                    )
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile & Settings",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
-                )
+                if (userProfile != null && userProfile.name.isNotBlank()) {
+                    Text(
+                        text = userProfile.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (userProfile.isAdmin) Color.Black else MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Profile & Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 

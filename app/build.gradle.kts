@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -101,6 +102,13 @@ dependencies {
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Firebase
+    val firebaseBom = platform("com.google.firebase:firebase-bom:32.8.1")
+    implementation(firebaseBom)
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

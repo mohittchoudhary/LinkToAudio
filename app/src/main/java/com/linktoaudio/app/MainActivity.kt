@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import com.linktoaudio.app.auth.data.UserProfile
+import com.linktoaudio.app.auth.ui.AdminPanelScreen
+import com.linktoaudio.app.auth.ui.AuthGate
+import com.linktoaudio.app.auth.viewmodel.AuthViewModel
 import com.linktoaudio.app.ui.components.MiniPlayer
 import com.linktoaudio.app.ui.screens.HomeScreen
 import com.linktoaudio.app.ui.screens.LibraryScreen
@@ -47,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val musicViewModel: MusicViewModel by viewModels()
+    private val authViewModel: AuthViewModel by viewModels()
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -62,9 +67,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LinkToAudioTheme {
-                MainAppScreen(
-                    viewModel = viewModel,
-                    musicViewModel = musicViewModel
+                AuthGate(
+                    authViewModel = authViewModel,
+                    mainContent = { userProfile ->
+                        MainAppScreen(
+                            viewModel = viewModel,
+                            musicViewModel = musicViewModel,
+                            authViewModel = authViewModel,
+                            userProfile = userProfile
+                        )
+                    }
                 )
             }
         }
@@ -110,10 +122,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(
     viewModel: MainViewModel,
-    musicViewModel: MusicViewModel
+    musicViewModel: MusicViewModel,
+    authViewModel: AuthViewModel,
+    userProfile: UserProfile
 ) {
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
     var isNowPlayingOpen by remember { mutableStateOf(false) }
+    var isAdminPanelOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
 
@@ -178,6 +193,7 @@ fun MainAppScreen(
             when (selectedTab) {
                 NavTab.HOME -> HomeScreen(
                     musicViewModel = musicViewModel,
+                    userProfile = userProfile,
                     onNavigateToConverter = { selectedTab = NavTab.SETTINGS }
                 )
                 NavTab.LIBRARY -> LibraryScreen(
@@ -185,7 +201,11 @@ fun MainAppScreen(
                     onNavigateToHome = { selectedTab = NavTab.SETTINGS }
                 )
                 NavTab.SEARCH -> SearchScreen(musicViewModel = musicViewModel)
-                NavTab.SETTINGS -> SettingsScreen(viewModel = viewModel)
+                NavTab.SETTINGS -> SettingsScreen(
+                    viewModel = viewModel,
+                    authViewModel = authViewModel,
+                    onOpenAdminPanel = { isAdminPanelOpen = true }
+                )
             }
         }
     }
@@ -202,6 +222,22 @@ fun MainAppScreen(
             NowPlayingScreen(
                 musicViewModel = musicViewModel,
                 onCollapse = { isNowPlayingOpen = false }
+            )
+        }
+    }
+
+    // Admin Panel Dialog
+    if (isAdminPanelOpen) {
+        Dialog(
+            onDismissRequest = { isAdminPanelOpen = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            AdminPanelScreen(
+                authViewModel = authViewModel,
+                onBack = { isAdminPanelOpen = false }
             )
         }
     }

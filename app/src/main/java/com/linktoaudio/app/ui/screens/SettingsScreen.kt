@@ -6,8 +6,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -17,20 +19,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.linktoaudio.app.auth.viewmodel.AuthViewModel
 import com.linktoaudio.app.data.AudioFormat
 import com.linktoaudio.app.data.AudioQuality
 import com.linktoaudio.app.ui.components.LinkConverterSection
+import com.linktoaudio.app.ui.theme.SpotifyGreen
 import com.linktoaudio.app.viewmodel.MainViewModel
 
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
+    authViewModel: AuthViewModel? = null,
+    onOpenAdminPanel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -51,6 +58,12 @@ fun SettingsScreen(
     var clientSecretInput by remember(spotifyClientSecret) { mutableStateOf(spotifyClientSecret) }
     var showSecret by remember { mutableStateOf(false) }
 
+    val userProfile by (authViewModel?.currentUserProfile?.collectAsState() ?: remember { mutableStateOf(null) })
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var deleteAccountPassword by remember { mutableStateOf("") }
+    var deletePasswordVisible by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -58,6 +71,167 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Account Card (if logged in)
+        if (userProfile != null) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Account",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (userProfile?.isAdmin == true) SpotifyGreen else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = userProfile?.name?.take(1)?.uppercase()?.ifBlank { "U" } ?: "U",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (userProfile?.isAdmin == true) Color.Black else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = userProfile?.name.orEmpty().ifBlank { "User" },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                if (userProfile?.isAdmin == true) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = SpotifyGreen.copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = "ADMIN",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SpotifyGreen,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = userProfile?.email.orEmpty(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Admin panel row ONLY if role == "admin"
+                    if (userProfile?.isAdmin == true) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = onOpenAdminPanel)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AdminPanelSettings,
+                                        contentDescription = null,
+                                        tint = SpotifyGreen,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Admin panel",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Manage users, permissions & accounts",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // Log out and Delete account buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { showLogoutConfirm = true },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Log out", style = MaterialTheme.typography.labelLarge)
+                        }
+
+                        TextButton(
+                            onClick = {
+                                deleteAccountPassword = ""
+                                showDeleteAccountDialog = true
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Delete account", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
+
         // Link to audio converter section at the top
         LinkConverterSection(
             viewModel = viewModel,
@@ -586,5 +760,121 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(90.dp))
+    }
+
+    // Logout Confirmation Dialog
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            icon = { Icon(Icons.Default.Logout, contentDescription = null, tint = SpotifyGreen) },
+            title = {
+                Text(
+                    text = "Log out?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to log out of LinkToAudio?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutConfirm = false
+                        authViewModel?.signOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SpotifyGreen)
+                ) {
+                    Text("Log out", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Delete Account Confirmation Dialog
+    if (showDeleteAccountDialog) {
+        val authError by (authViewModel?.errorMessage?.collectAsState() ?: remember { mutableStateOf(null) })
+        val isDeleting by (authViewModel?.isLoading?.collectAsState() ?: remember { mutableStateOf(false) })
+
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) showDeleteAccountDialog = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = {
+                Text(
+                    text = "Delete your account?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "This will permanently delete your user data in Firestore and your account. Please enter your password to confirm:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    if (!authError.isNullOrBlank()) {
+                        Text(
+                            text = authError ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = deleteAccountPassword,
+                        onValueChange = { deleteAccountPassword = it },
+                        placeholder = { Text("Current password") },
+                        singleLine = true,
+                        visualTransformation = if (deletePasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !isDeleting,
+                        trailingIcon = {
+                            IconButton(onClick = { deletePasswordVisible = !deletePasswordVisible }) {
+                                Icon(
+                                    imageVector = if (deletePasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null
+                                )
+                            }
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        authViewModel?.deleteAccount(deleteAccountPassword) {
+                            showDeleteAccountDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    enabled = !isDeleting && deleteAccountPassword.isNotBlank()
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                    } else {
+                        Text("Permanently Delete")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteAccountDialog = false },
+                    enabled = !isDeleting
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
