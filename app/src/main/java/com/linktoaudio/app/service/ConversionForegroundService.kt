@@ -232,7 +232,7 @@ class ConversionForegroundService : Service() {
                 ConversionStateHolder.updateState(ConversionState.Saving(metadata))
                 updateNotification(
                     title = "Saving Audio",
-                    content = "Writing to Music/LinkToAudio...",
+                    content = "Writing to audio library...",
                     progress = 0,
                     isIndeterminate = true
                 )
@@ -444,10 +444,11 @@ class ConversionForegroundService : Service() {
             if (ConversionStateHolder.isCancelled) {
                 ConversionStateHolder.updateState(ConversionState.Error("Playlist conversion cancelled by user."))
             } else {
+                val folderBase = appSettings.customDownloadFolderName?.takeIf { it.isNotBlank() } ?: "Music/Mohit Music"
                 val destFolder = if (!playlistTitle.isNullOrBlank()) {
-                    "Music/LinkToAudio/$playlistTitle"
+                    "$folderBase/$playlistTitle"
                 } else {
-                    "Music/LinkToAudio"
+                    folderBase
                 }
 
                 ConversionStateHolder.updateState(
@@ -611,7 +612,7 @@ class ConversionForegroundService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Audio saved")
-            .setContentText("${item.title}.${format.extension} saved to Music/LinkToAudio")
+            .setContentText("${item.title}.${format.extension} saved")
             .setAutoCancel(true)
             .setContentIntent(playPendingIntent)
             .build()

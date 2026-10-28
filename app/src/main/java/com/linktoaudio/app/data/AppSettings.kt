@@ -44,6 +44,18 @@ class AppSettings(context: Context) {
         MutableStateFlow(prefs.getInt(KEY_DEFAULT_SLEEP_TIMER_MINUTES, 0))
     val defaultSleepTimerMinutesFlow: StateFlow<Int> = _defaultSleepTimerMinutesFlow.asStateFlow()
 
+    private val _customDownloadTreeUriFlow =
+        MutableStateFlow(prefs.getString(KEY_CUSTOM_DOWNLOAD_TREE_URI, null))
+    val customDownloadTreeUriFlow: StateFlow<String?> = _customDownloadTreeUriFlow.asStateFlow()
+
+    private val _customDownloadFolderNameFlow =
+        MutableStateFlow(prefs.getString(KEY_CUSTOM_DOWNLOAD_FOLDER_NAME, null))
+    val customDownloadFolderNameFlow: StateFlow<String?> = _customDownloadFolderNameFlow.asStateFlow()
+
+    private val _volumeBoostPercentFlow =
+        MutableStateFlow(prefs.getInt(KEY_VOLUME_BOOST_PERCENT, 100))
+    val volumeBoostPercentFlow: StateFlow<Int> = _volumeBoostPercentFlow.asStateFlow()
+
     var autoConvertOnShare: Boolean
         get() = prefs.getBoolean(KEY_AUTO_CONVERT_ON_SHARE, true)
         set(value) {
@@ -104,8 +116,43 @@ class AppSettings(context: Context) {
             _defaultSleepTimerMinutesFlow.value = value
         }
 
+    var customDownloadTreeUri: String?
+        get() = prefs.getString(KEY_CUSTOM_DOWNLOAD_TREE_URI, null)
+        set(value) {
+            prefs.edit().putString(KEY_CUSTOM_DOWNLOAD_TREE_URI, value).apply()
+            _customDownloadTreeUriFlow.value = value
+        }
+
+    var customDownloadFolderName: String?
+        get() = prefs.getString(KEY_CUSTOM_DOWNLOAD_FOLDER_NAME, null)
+        set(value) {
+            prefs.edit().putString(KEY_CUSTOM_DOWNLOAD_FOLDER_NAME, value).apply()
+            _customDownloadFolderNameFlow.value = value
+        }
+
+    var volumeBoostPercent: Int
+        get() = prefs.getInt(KEY_VOLUME_BOOST_PERCENT, 100)
+        set(value) {
+            val clamped = value.coerceIn(0, 200)
+            prefs.edit().putInt(KEY_VOLUME_BOOST_PERCENT, clamped).apply()
+            _volumeBoostPercentFlow.value = clamped
+        }
+
+    fun setCustomDownloadFolder(uriString: String?, folderName: String?) {
+        prefs.edit()
+            .putString(KEY_CUSTOM_DOWNLOAD_TREE_URI, uriString)
+            .putString(KEY_CUSTOM_DOWNLOAD_FOLDER_NAME, folderName)
+            .apply()
+        _customDownloadTreeUriFlow.value = uriString
+        _customDownloadFolderNameFlow.value = folderName
+    }
+
+    fun resetCustomDownloadFolder() {
+        setCustomDownloadFolder(null, null)
+    }
+
     companion object {
-        private const val PREFS_NAME = "link_to_audio_prefs"
+        private const val PREFS_NAME = "mohit_music_prefs"
         private const val KEY_AUTO_CONVERT_ON_SHARE = "key_auto_convert_on_share"
         private const val KEY_DEFAULT_FORMAT = "key_default_format"
         private const val KEY_AUDIO_QUALITY = "key_audio_quality"
@@ -114,6 +161,9 @@ class AppSettings(context: Context) {
         private const val KEY_SPOTIFY_CLIENT_SECRET = "key_spotify_client_secret"
         private const val KEY_SCAN_ENTIRE_MUSIC_FOLDER = "key_scan_entire_music_folder"
         private const val KEY_DEFAULT_SLEEP_TIMER_MINUTES = "key_default_sleep_timer_minutes"
+        private const val KEY_CUSTOM_DOWNLOAD_TREE_URI = "key_custom_download_tree_uri"
+        private const val KEY_CUSTOM_DOWNLOAD_FOLDER_NAME = "key_custom_download_folder_name"
+        private const val KEY_VOLUME_BOOST_PERCENT = "key_volume_boost_percent"
 
         @Volatile
         private var INSTANCE: AppSettings? = null

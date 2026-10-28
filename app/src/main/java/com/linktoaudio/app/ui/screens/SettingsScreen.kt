@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,10 +30,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import com.linktoaudio.app.data.AudioFormat
 import com.linktoaudio.app.data.AudioQuality
 import com.linktoaudio.app.ui.components.LinkConverterSection
 import com.linktoaudio.app.ui.theme.SpotifyGreen
+import com.linktoaudio.app.utils.MediaSaver
 import com.linktoaudio.app.viewmodel.MainViewModel
 import com.linktoaudio.app.viewmodel.MusicViewModel
 
@@ -55,6 +59,31 @@ fun SettingsScreen(
     val scanEntireMusicFolder by viewModel.scanEntireMusicFolder.collectAsState()
     val defaultSleepTimerMinutes by viewModel.defaultSleepTimerMinutes.collectAsState()
 
+    val customDownloadTreeUri by viewModel.customDownloadTreeUri.collectAsState()
+    val customDownloadFolderName by viewModel.customDownloadFolderName.collectAsState()
+
+    val isFolderAccessible = remember(customDownloadTreeUri) {
+        if (customDownloadTreeUri.isNullOrBlank()) true
+        else MediaSaver.isTreeUriAccessible(context, customDownloadTreeUri)
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri != null) {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try {
+                context.contentResolver.takePersistableUriPermission(treeUri, flags)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            val doc = DocumentFile.fromTreeUri(context, treeUri)
+            val name = doc?.name ?: "Custom Folder"
+            viewModel.setCustomDownloadFolder(treeUri.toString(), name)
+            musicViewModel?.refreshLibrary()
+        }
+    }
+
     var clientIdInput by remember(spotifyClientId) { mutableStateOf(spotifyClientId.orEmpty()) }
     var clientSecretInput by remember(spotifyClientSecret) { mutableStateOf(spotifyClientSecret.orEmpty()) }
     var showSecret by remember { mutableStateOf(false) }
@@ -71,6 +100,108 @@ fun SettingsScreen(
             viewModel = viewModel,
             modifier = Modifier.fillMaxWidth()
         )
+
+        // Download Folder Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Download folder",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "Choose any folder on internal storage or SD card for converted audio files.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (!isFolderAccessible && !customDownloadTreeUri.isNullOrBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Selected folder is no longer accessible (SD card removed or permission lost). Downloads will fall back to Music/Mohit Music.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Current location",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = when {
+                                !customDownloadTreeUri.isNullOrBlank() && !isFolderAccessible -> "⚠️ ${customDownloadFolderName ?: "Chosen folder"} (Inaccessible)"
+                                !customDownloadTreeUri.isNullOrBlank() -> "📁 ${customDownloadFolderName ?: "Chosen folder"}"
+                                else -> "📁 Music/Mohit Music (Default)"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!customDownloadTreeUri.isNullOrBlank()) {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.resetCustomDownloadFolder()
+                                    musicViewModel?.refreshLibrary()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Reset")
+                            }
+                        }
+
+                        Button(
+                            onClick = { folderPickerLauncher.launch(null) },
+                            colors = ButtonDefaults.buttonColors(containerColor = SpotifyGreen),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                if (!isFolderAccessible && !customDownloadTreeUri.isNullOrBlank()) "Choose folder" else "Change folder",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         HorizontalDivider(
             modifier = Modifier.padding(vertical = 4.dp),

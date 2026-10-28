@@ -190,7 +190,7 @@ class MusicStorageManager private constructor(private val context: Context) {
     }
 
     suspend fun toggleFavorite(songId: Long): Boolean {
-        var isFav = false
+        val isFav: Boolean
         mutex.withLock {
             val current = _favoritesFlow.value.toMutableSet()
             if (current.contains(songId)) {

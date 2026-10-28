@@ -46,6 +46,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val spotifyClientSecret = appSettings.spotifyClientSecretFlow
     val scanEntireMusicFolder = appSettings.scanEntireMusicFolderFlow
     val defaultSleepTimerMinutes = appSettings.defaultSleepTimerMinutesFlow
+    val customDownloadTreeUri = appSettings.customDownloadTreeUriFlow
+    val customDownloadFolderName = appSettings.customDownloadFolderNameFlow
 
     private val _playlistPreview = MutableStateFlow<PlaylistInfo?>(null)
     val playlistPreview: StateFlow<PlaylistInfo?> = _playlistPreview.asStateFlow()
@@ -369,6 +371,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSnackbar() {
         _snackbarMessage.value = null
+    }
+
+    fun showSnackbar(message: String) {
+        _snackbarMessage.value = message
+    }
+
+    fun setCustomDownloadFolder(uriString: String?, folderName: String?) {
+        appSettings.setCustomDownloadFolder(uriString, folderName)
+    }
+
+    fun resetCustomDownloadFolder() {
+        appSettings.resetCustomDownloadFolder()
     }
 
     fun refreshEngineVersion() {

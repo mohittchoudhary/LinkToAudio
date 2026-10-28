@@ -451,7 +451,6 @@ fun LibraryScreen(
     }
 
     selectedPlaylist?.let { pl ->
-        val allSongs by musicViewModel.allSongs.collectAsState()
         val plSongs = pl.songIds.mapNotNull { id -> allSongs.firstOrNull { it.id == id } }
         SongsDetailDialog(
             title = pl.name,
