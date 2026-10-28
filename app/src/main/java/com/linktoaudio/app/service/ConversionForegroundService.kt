@@ -22,6 +22,7 @@ import com.linktoaudio.app.data.ConversionState
 import com.linktoaudio.app.data.ConversionStateHolder
 import com.linktoaudio.app.data.PlaylistTrack
 import com.linktoaudio.app.data.VideoMetadata
+import com.linktoaudio.app.player.data.SongArtworkLoader
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.MediaSaver
 import com.yausername.youtubedl_android.YoutubeDL
@@ -197,8 +198,7 @@ class ConversionForegroundService : Service() {
                     quality = quality,
                     tempDir = tempDir,
                     processId = processId,
-                    forceSingleVideo = forceSingleVideo,
-                    isSpotify = isSpotify
+                    forceSingleVideo = forceSingleVideo
                 ) { progress, eta ->
                     if (!ConversionStateHolder.isCancelled) {
                         if (progress >= 100f) {
@@ -229,6 +229,27 @@ class ConversionForegroundService : Service() {
 
                 if (ConversionStateHolder.isCancelled) return@launch
 
+                val generatedFile = tempDir.listFiles()?.firstOrNull {
+                    it.extension.equals(format.extension, ignoreCase = true)
+                } ?: throw IllegalStateException("Audio conversion finished but output file was not found.")
+
+                // Crop and cache thumbnail to square if written by yt-dlp
+                val rawThumbnail = tempDir.listFiles()?.firstOrNull {
+                    it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true)
+                }
+                if (rawThumbnail != null) {
+                    val sidecarTarget = File(tempDir, "${generatedFile.nameWithoutExtension}.jpg")
+                    if (rawThumbnail.absolutePath != sidecarTarget.absolutePath) {
+                        rawThumbnail.renameTo(sidecarTarget)
+                    }
+                    SongArtworkLoader.processAndCacheThumbnail(
+                        context = applicationContext,
+                        thumbnailFile = sidecarTarget,
+                        songTitle = metadata.title,
+                        songContentUri = null
+                    )
+                }
+
                 ConversionStateHolder.updateState(ConversionState.Saving(metadata))
                 updateNotification(
                     title = "Saving Audio",
@@ -237,10 +258,6 @@ class ConversionForegroundService : Service() {
                     isIndeterminate = true
                 )
 
-                val generatedFile = tempDir.listFiles()?.firstOrNull {
-                    it.extension.equals(format.extension, ignoreCase = true)
-                } ?: throw IllegalStateException("Audio conversion finished but output file was not found.")
-
                 val saveResult = MediaSaver.saveAudioFile(
                     context = applicationContext,
                     tempFile = generatedFile,
@@ -248,6 +265,19 @@ class ConversionForegroundService : Service() {
                     format = format,
                     subfolder = null
                 )
+
+                // Update cache with final saved contentUri if available
+                saveResult.uri?.let { finalUri ->
+                    val sidecarTarget = File(tempDir, "${generatedFile.nameWithoutExtension}.jpg")
+                    if (sidecarTarget.exists()) {
+                        SongArtworkLoader.processAndCacheThumbnail(
+                            context = applicationContext,
+                            thumbnailFile = sidecarTarget,
+                            songTitle = metadata.title,
+                            songContentUri = finalUri.toString()
+                        )
+                    }
+                }
 
                 val historyItem = ConversionItem(
                     id = UUID.randomUUID().toString(),
@@ -374,8 +404,7 @@ class ConversionForegroundService : Service() {
                         quality = quality,
                         tempDir = tempDir,
                         processId = processId,
-                        forceSingleVideo = true,
-                        isSpotify = isSpotify
+                        forceSingleVideo = true
                     ) { progress, eta ->
                         if (!ConversionStateHolder.isCancelled) {
                             ConversionStateHolder.updateState(
@@ -407,6 +436,23 @@ class ConversionForegroundService : Service() {
                         it.extension.equals(format.extension, ignoreCase = true)
                     } ?: throw IllegalStateException("Audio file not found for track: $trackTitle")
 
+                    // Crop and cache thumbnail to square if written by yt-dlp
+                    val rawThumbnail = tempDir.listFiles()?.firstOrNull {
+                        it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true)
+                    }
+                    if (rawThumbnail != null) {
+                        val sidecarTarget = File(tempDir, "${generatedFile.nameWithoutExtension}.jpg")
+                        if (rawThumbnail.absolutePath != sidecarTarget.absolutePath) {
+                            rawThumbnail.renameTo(sidecarTarget)
+                        }
+                        SongArtworkLoader.processAndCacheThumbnail(
+                            context = applicationContext,
+                            thumbnailFile = sidecarTarget,
+                            songTitle = resolvedTitle,
+                            songContentUri = null
+                        )
+                    }
+
                     val saveResult = MediaSaver.saveAudioFile(
                         context = applicationContext,
                         tempFile = generatedFile,
@@ -414,6 +460,18 @@ class ConversionForegroundService : Service() {
                         format = format,
                         subfolder = playlistTitle
                     )
+
+                    saveResult.uri?.let { finalUri ->
+                        val sidecarTarget = File(tempDir, "${generatedFile.nameWithoutExtension}.jpg")
+                        if (sidecarTarget.exists()) {
+                            SongArtworkLoader.processAndCacheThumbnail(
+                                context = applicationContext,
+                                thumbnailFile = sidecarTarget,
+                                songTitle = resolvedTitle,
+                                songContentUri = finalUri.toString()
+                            )
+                        }
+                    }
 
                     val historyItem = ConversionItem(
                         id = UUID.randomUUID().toString(),
@@ -489,7 +547,6 @@ class ConversionForegroundService : Service() {
         tempDir: File,
         processId: String,
         forceSingleVideo: Boolean,
-        isSpotify: Boolean,
         callback: (Float, Long) -> Unit
     ) {
         fun buildRequest(embedMetadata: Boolean, embedThumbnail: Boolean): YoutubeDLRequest {
@@ -501,8 +558,11 @@ class ConversionForegroundService : Service() {
                     addOption("--no-playlist")
                 }
                 addOption("-o", "${tempDir.absolutePath}/%(title)s.%(ext)s")
+                addOption("--write-thumbnail")
+                addOption("--convert-thumbnails", "jpg")
                 if (embedMetadata) {
                     addOption("--embed-metadata")
+                    addOption("--parse-metadata", "%(title)s:%(album)s")
                 }
                 if (embedThumbnail) {
                     addOption("--embed-thumbnail")
@@ -511,14 +571,14 @@ class ConversionForegroundService : Service() {
         }
 
         try {
-            val request = buildRequest(embedMetadata = isSpotify, embedThumbnail = isSpotify)
+            val request = buildRequest(embedMetadata = true, embedThumbnail = true)
             YoutubeDL.getInstance().execute(request, processId) { progress, eta, _ ->
                 callback(progress, eta)
             }
         } catch (e: Exception) {
-            if (isSpotify && !ConversionStateHolder.isCancelled) {
-                // Retry without embed-thumbnail/metadata in case FFmpeg or environment fails embedding
-                val retryRequest = buildRequest(embedMetadata = false, embedThumbnail = false)
+            if (!ConversionStateHolder.isCancelled) {
+                // Retry without embed-thumbnail in case FFmpeg embedding encounters an issue
+                val retryRequest = buildRequest(embedMetadata = true, embedThumbnail = false)
                 YoutubeDL.getInstance().execute(retryRequest, processId) { progress, eta, _ ->
                     callback(progress, eta)
                 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.PlayerController
+import com.linktoaudio.app.player.data.SongArtwork
 
 @Composable
 fun MiniPlayer(
@@ -70,27 +71,13 @@ fun MiniPlayer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (!song.albumArtUri.isNullOrBlank()) {
-                        AsyncImage(
-                            model = song.albumArtUri,
-                            contentDescription = song.title,
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop,
-                            error = painterResource(id = R.drawable.ic_default_album_art),
-                            placeholder = painterResource(id = R.drawable.ic_default_album_art)
-                        )
-                    } else {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_default_album_art),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    SongArtwork(
+                        song = song,
+                        contentDescription = song.title,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

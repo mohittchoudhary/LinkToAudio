@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
+import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.*
 import com.linktoaudio.app.ui.components.CreatePlaylistDialog
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
@@ -111,7 +114,7 @@ fun LibraryScreen(
                 Box {
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(
-                            imageVector = Icons.Default.Sort,
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
                             contentDescription = "Sort Options"
                         )
                     }
@@ -491,31 +494,13 @@ fun RecentlyDownloadedItem(
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            Box(
+            SongArtwork(
+                song = song,
+                contentDescription = song.title,
                 modifier = Modifier
                     .size(114.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!song.albumArtUri.isNullOrBlank()) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = song.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        error = painterResource(id = R.drawable.ic_default_album_art),
-                        placeholder = painterResource(id = R.drawable.ic_default_album_art)
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_default_album_art),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
+            )
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -587,27 +572,13 @@ fun SongRowItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (!song.albumArtUri.isNullOrBlank()) {
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = song.title,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.ic_default_album_art),
-                placeholder = painterResource(id = R.drawable.ic_default_album_art)
-            )
-        } else {
-            Image(
-                painter = painterResource(id = R.drawable.ic_default_album_art),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-        }
+        SongArtwork(
+            song = song,
+            contentDescription = song.title,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -862,7 +833,7 @@ fun PlaylistsTab(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(imageVector = Icons.Default.QueueMusic, contentDescription = null)
+                            Icon(imageVector = Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null)
                             Column {
                                 Text(
                                     text = pl.name,

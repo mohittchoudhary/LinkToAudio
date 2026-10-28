@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
+import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.theme.SpotifyGreen
@@ -298,16 +300,12 @@ private fun QuickPickCard(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = song.albumArtUri,
+            SongArtwork(
+                song = song,
                 contentDescription = song.title,
-                fallback = painterResource(R.drawable.ic_default_album_art),
-                error = painterResource(R.drawable.ic_default_album_art),
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
             )
 
             Text(
@@ -439,16 +437,12 @@ private fun SongSquareCard(
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
     ) {
-        AsyncImage(
-            model = song.albumArtUri,
+        SongArtwork(
+            song = song,
             contentDescription = song.title,
-            fallback = painterResource(R.drawable.ic_default_album_art),
-            error = painterResource(R.drawable.ic_default_album_art),
-            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(140.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
 
         Text(
@@ -495,7 +489,7 @@ private fun HomePlaylistRow(
                     val idSet = playlist.songIds.toSet()
                     allSongs.filter { idSet.contains(it.id) }
                 }
-                val coverArt = playlistSongs.firstOrNull { !it.albumArtUri.isNullOrBlank() }?.albumArtUri
+                val firstSongWithArt = playlistSongs.firstOrNull()
 
                 Column(
                     modifier = Modifier
@@ -503,17 +497,13 @@ private fun HomePlaylistRow(
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { onPlaylistClick(playlist, playlistSongs) }
                 ) {
-                    if (!coverArt.isNullOrBlank()) {
-                        AsyncImage(
-                            model = coverArt,
+                    if (firstSongWithArt != null) {
+                        SongArtwork(
+                            song = firstSongWithArt,
                             contentDescription = playlist.name,
-                            fallback = painterResource(R.drawable.ic_default_album_art),
-                            error = painterResource(R.drawable.ic_default_album_art),
-                            contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(140.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         )
                     } else {
                         Box(
@@ -524,7 +514,7 @@ private fun HomePlaylistRow(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.QueueMusic,
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(48.dp)

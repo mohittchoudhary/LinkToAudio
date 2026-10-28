@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
 
@@ -59,30 +62,13 @@ fun SongMenuBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (!song.albumArtUri.isNullOrBlank()) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = song.title,
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Surface(
-                        modifier = Modifier.size(54.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+                SongArtwork(
+                    song = song,
+                    contentDescription = song.title,
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -105,7 +91,7 @@ fun SongMenuBottomSheet(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             SongMenuItem(
-                icon = Icons.Default.QueueMusic,
+                icon = Icons.AutoMirrored.Filled.QueueMusic,
                 title = "Play next",
                 onClick = {
                     onPlayNext()
@@ -114,7 +100,7 @@ fun SongMenuBottomSheet(
             )
 
             SongMenuItem(
-                icon = Icons.Default.PlaylistAdd,
+                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
                 title = "Add to queue",
                 onClick = {
                     onAddToQueue()
@@ -298,7 +284,7 @@ fun AddToPlaylistDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.QueueMusic,
+                                    Icons.AutoMirrored.Filled.QueueMusic,
                                     contentDescription = null,
                                     modifier = Modifier.padding(end = 12.dp)
                                 )

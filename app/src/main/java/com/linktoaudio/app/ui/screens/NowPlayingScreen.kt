@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.PlayerController
+import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.PlayerRepeatMode
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.components.AddToPlaylistDialog
@@ -138,7 +141,7 @@ fun NowPlayingScreen(
 
                 IconButton(onClick = { showQueueSheet = true }) {
                     Icon(
-                        imageVector = Icons.Default.QueueMusic,
+                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = "Playback Queue"
                     )
                 }
@@ -162,23 +165,11 @@ fun NowPlayingScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (!song.albumArtUri.isNullOrBlank()) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = song.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_default_album_art),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        tint = Color.Unspecified
-                    )
-                }
+                SongArtwork(
+                    song = song,
+                    contentDescription = song.title,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -373,7 +364,7 @@ fun NowPlayingScreen(
                 // Add to Playlist
                 IconButton(onClick = { showAddToPlaylistDialog = true }) {
                     Icon(
-                        imageVector = Icons.Default.PlaylistAdd,
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                         contentDescription = "Add to Playlist",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

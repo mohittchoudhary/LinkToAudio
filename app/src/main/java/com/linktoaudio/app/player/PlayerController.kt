@@ -15,6 +15,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.linktoaudio.app.data.AppSettings
 import com.linktoaudio.app.player.data.MusicStorageManager
+import com.linktoaudio.app.player.data.SongArtworkLoader
 import com.linktoaudio.app.player.model.PlayerRepeatMode
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.player.service.PlaybackService
@@ -500,11 +501,20 @@ class PlayerController private constructor(private val context: Context) {
     }
 
     private fun Song.toMediaItem(): MediaItem {
+        val artBytes = SongArtworkLoader.getEmbeddedOrCachedBytes(context, this)
+        val artUri = SongArtworkLoader.getArtworkUri(context, this)
+
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
             .setAlbumTitle(album)
-            .setArtworkUri(albumArtUri?.let { Uri.parse(it) })
+            .apply {
+                if (artBytes != null) {
+                    setArtworkData(artBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                } else if (artUri != null) {
+                    setArtworkUri(artUri)
+                }
+            }
             .build()
 
         return MediaItem.Builder()
