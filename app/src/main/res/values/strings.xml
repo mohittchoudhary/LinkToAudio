@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">LinkToAudio</string>
+    <string name="app_name">Mohit Music</string>
     <string name="notification_channel_name">Audio Conversion</string>
     <string name="notification_channel_desc">Shows progress of downloading and converting audio</string>
     <string name="disclaimer">Only download content you own or have permission to use.</string>

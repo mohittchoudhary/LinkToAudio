@@ -28,7 +28,7 @@ class ShareReceiverActivity : Activity() {
                         format = appSettings.defaultFormat,
                         quality = appSettings.audioQuality
                     )
-                    Toast.makeText(this, "LinkToAudio: Converting audio...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Mohit Music: Converting audio...", Toast.LENGTH_SHORT).show()
                 } else {
                     val mainIntent = Intent(this, MainActivity::class.java).apply {
                         action = Intent.ACTION_SEND

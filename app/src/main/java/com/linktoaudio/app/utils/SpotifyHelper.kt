@@ -130,7 +130,7 @@ object SpotifyHelper {
             throw IllegalStateException("Spotify embed page data could not be parsed.")
         }
 
-        val scriptJson = matcher.group(1)
+        val scriptJson = matcher.group(1) ?: throw IllegalStateException("Spotify embed page data is empty.")
         val rootJson = JSONObject(scriptJson)
         val entity = rootJson.getJSONObject("props")
             .getJSONObject("pageProps")

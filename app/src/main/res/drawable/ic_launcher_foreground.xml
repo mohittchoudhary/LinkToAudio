@@ -4,36 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:translateX="0"
-        android:translateY="0">
-        <!-- Headphone Band -->
-        <path
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="4"
-            android:strokeLineCap="round"
-            android:pathData="M 36,54 A 18,18 0 0 1 72,54" />
-        <!-- Left Ear Cup -->
-        <path
-            android:fillColor="#EADDFF"
-            android:pathData="M 32,52 L 38,52 A 3,3 0 0 1 41,55 L 41,63 A 3,3 0 0 1 38,66 L 32,66 A 3,3 0 0 1 29,63 L 29,55 A 3,3 0 0 1 32,52 Z" />
-        <!-- Right Ear Cup -->
-        <path
-            android:fillColor="#EADDFF"
-            android:pathData="M 70,52 L 76,52 A 3,3 0 0 1 79,55 L 79,63 A 3,3 0 0 1 76,66 L 70,66 A 3,3 0 0 1 67,63 L 67,55 A 3,3 0 0 1 70,52 Z" />
-        <!-- Download Arrow Shaft -->
-        <path
-            android:fillColor="#38E1FF"
-            android:pathData="M 52,44 L 56,44 L 56,60 L 52,60 Z" />
-        <!-- Download Arrow Head -->
-        <path
-            android:fillColor="#38E1FF"
-            android:pathData="M 46,58 L 54,68 L 62,58 Z" />
-        <!-- Audio Base Bar -->
-        <path
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="3.5"
-            android:strokeLineCap="round"
-            android:pathData="M 44,75 L 64,75" />
-    </group>
+    <!-- Bold white letter 'M' centered in safe zone (34..74, 34..74) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 34,74 L 34,34 L 43,34 L 54,54 L 65,34 L 74,34 L 74,74 L 66,74 L 66,48 L 57,66 L 51,66 L 42,48 L 42,74 Z" />
 </vector>

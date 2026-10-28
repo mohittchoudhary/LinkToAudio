@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
-import com.linktoaudio.app.auth.data.UserProfile
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.theme.SpotifyGreen
@@ -42,7 +41,6 @@ import java.util.Calendar
 @Composable
 fun HomeScreen(
     musicViewModel: MusicViewModel,
-    userProfile: UserProfile? = null,
     onNavigateToConverter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -80,7 +78,7 @@ fun HomeScreen(
         }
     }
 
-    // Greeting calculation
+    // Plain greeting calculation based on time of day
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
@@ -89,18 +87,6 @@ fun HomeScreen(
             else -> "Good evening"
         }
     }
-
-    val fallbackDeviceName = remember {
-        try {
-            val name = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
-            if (!name.isNullOrBlank() && name != "Android" && name != "unknown") name else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    val displayName = userProfile?.name?.takeIf { it.isNotBlank() } ?: fallbackDeviceName
-    val greetingText = if (!displayName.isNullOrBlank()) "$greeting, $displayName" else greeting
 
     // Quick picks candidates: recently played, or fallback to all songs (recently added)
     val quickPickCandidates = remember(recentlyPlayed, allSongs) {
@@ -117,7 +103,7 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 90.dp)
     ) {
-        // Top Greeting Header with Profile Icon
+        // Top Greeting Header with M Logo
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,39 +111,40 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = greetingText,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
-            )
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_mohit_music_logo),
+                    contentDescription = "Mohit Music Logo",
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             IconButton(
                 onClick = onNavigateToConverter,
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (userProfile?.isAdmin == true) SpotifyGreen else MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                if (userProfile != null && userProfile.name.isNotBlank()) {
-                    Text(
-                        text = userProfile.name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (userProfile.isAdmin) Color.Black else MaterialTheme.colorScheme.onSurface
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile & Settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
@@ -279,7 +266,7 @@ fun HomeScreen(
                     title = "Your playlists",
                     playlists = playlists,
                     allSongs = allSongs,
-                    onPlaylistClick = { playlist, playlistSongs ->
+                    onPlaylistClick = { _, playlistSongs ->
                         if (playlistSongs.isNotEmpty()) {
                             musicViewModel.playerController.playSong(playlistSongs.first(), playlistSongs)
                         }

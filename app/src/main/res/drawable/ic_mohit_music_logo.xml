@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Rounded Dark #121212 Background -->
+    <path
+        android:fillColor="#121212"
+        android:pathData="M 16,0 L 92,0 A 16,16 0 0 1 108,16 L 108,92 A 16,16 0 0 1 92,108 L 16,108 A 16,16 0 0 1 0,92 L 0,16 A 16,16 0 0 1 16,0 Z" />
+    <!-- Spotify Green #1DB954 Accent Ring -->
+    <path
+        android:strokeColor="#1DB954"
+        android:strokeWidth="3.5"
+        android:strokeAlpha="0.9"
+        android:pathData="M 26,54 A 28,28 0 1,0 82,54 A 28,28 0 1,0 26,54" />
+    <!-- Bold white letter 'M' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 34,74 L 34,34 L 43,34 L 54,54 L 65,34 L 74,34 L 74,74 L 66,74 L 66,48 L 57,66 L 51,66 L 42,48 L 42,74 Z" />
+</vector>

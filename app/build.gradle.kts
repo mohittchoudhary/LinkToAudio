@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -100,15 +99,14 @@ dependencies {
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
 
+    // DocumentFile for Storage Access Framework (SAF) folder picker
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Palette for dynamic artwork colors
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
-
-    // Firebase
-    val firebaseBom = platform("com.google.firebase:firebase-bom:32.8.1")
-    implementation(firebaseBom)
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -4,40 +4,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Rounded Rectangle Background -->
+    <!-- Rounded Dark #121212 Background -->
     <path
-        android:fillColor="#4F378B"
-        android:pathData="M 12,0 L 96,0 A 12,12 0 0 1 108,12 L 108,96 A 12,12 0 0 1 96,108 L 12,108 A 12,12 0 0 1 0,96 L 0,12 A 12,12 0 0 1 12,0 Z" />
+        android:fillColor="#121212"
+        android:pathData="M 16,0 L 92,0 A 16,16 0 0 1 108,16 L 108,92 A 16,16 0 0 1 92,108 L 16,108 A 16,16 0 0 1 0,92 L 0,16 A 16,16 0 0 1 16,0 Z" />
+    <!-- Green Accent Ring -->
     <path
-        android:fillColor="#6750A4"
-        android:pathData="M 0,0 L 108,108 L 0,108 Z" />
-
-    <!-- Headphone Band -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:pathData="M 36,54 A 18,18 0 0 1 72,54" />
-    <!-- Left Ear Cup -->
-    <path
-        android:fillColor="#EADDFF"
-        android:pathData="M 32,52 L 38,52 A 3,3 0 0 1 41,55 L 41,63 A 3,3 0 0 1 38,66 L 32,66 A 3,3 0 0 1 29,63 L 29,55 A 3,3 0 0 1 32,52 Z" />
-    <!-- Right Ear Cup -->
-    <path
-        android:fillColor="#EADDFF"
-        android:pathData="M 70,52 L 76,52 A 3,3 0 0 1 79,55 L 79,63 A 3,3 0 0 1 76,66 L 70,66 A 3,3 0 0 1 67,63 L 67,55 A 3,3 0 0 1 70,52 Z" />
-    <!-- Download Arrow Shaft -->
-    <path
-        android:fillColor="#38E1FF"
-        android:pathData="M 52,44 L 56,44 L 56,60 L 52,60 Z" />
-    <!-- Download Arrow Head -->
-    <path
-        android:fillColor="#38E1FF"
-        android:pathData="M 46,58 L 54,68 L 62,58 Z" />
-    <!-- Audio Base Bar -->
-    <path
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#1DB954"
         android:strokeWidth="3.5"
-        android:strokeLineCap="round"
-        android:pathData="M 44,75 L 64,75" />
+        android:strokeAlpha="0.85"
+        android:pathData="M 26,54 A 28,28 0 1,0 82,54 A 28,28 0 1,0 26,54" />
+    <!-- Bold white letter 'M' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 34,74 L 34,34 L 43,34 L 54,54 L 65,34 L 74,34 L 74,74 L 66,74 L 66,48 L 57,66 L 51,66 L 42,48 L 42,74 Z" />
 </vector>
