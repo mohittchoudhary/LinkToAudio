@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.linktoaudio.app.MainActivity
 import com.linktoaudio.app.R
@@ -50,7 +52,14 @@ class ConversionForegroundService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private var conversionJob: Job? = null
+    private var conversionGeneration = 0L
     private lateinit var notificationManager: NotificationManager
+    private var lastSingleProgressPercent: Int? = null
+    private var lastSingleProgressAtMs = 0L
+    private var lastQueueUiProgressPercent: Int? = null
+    private var lastQueueUiProgressAtMs = 0L
+    private var lastQueueNotificationProgressPercent: Int? = null
+    private var lastQueueNotificationProgressAtMs = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -83,6 +92,9 @@ class ConversionForegroundService : Service() {
                         isSpotify = isSpotify,
                         forceSingleVideo = forceSingle
                     )
+                } else {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
                 }
             }
 
@@ -103,6 +115,9 @@ class ConversionForegroundService : Service() {
                         quality = quality,
                         isSpotify = isSpotify
                     )
+                } else {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
                 }
             }
 
@@ -123,6 +138,9 @@ class ConversionForegroundService : Service() {
         forceSingleVideo: Boolean
     ) {
         conversionJob?.cancel()
+        val generation = ++conversionGeneration
+        lastSingleProgressPercent = 0
+        lastSingleProgressAtMs = SystemClock.elapsedRealtime()
 
         val initialNotification = buildProgressNotification(
             title = "Converting to ${format.displayName}",
@@ -133,6 +151,7 @@ class ConversionForegroundService : Service() {
 
         promoteToForeground(initialNotification)
 
+        var conversionReachedExtraction = false
         conversionJob = serviceScope.launch {
             val processId = UUID.randomUUID().toString()
             ConversionStateHolder.currentProcessId = processId
@@ -202,27 +221,40 @@ class ConversionForegroundService : Service() {
                 ) { progress, eta ->
                     if (!ConversionStateHolder.isCancelled) {
                         if (progress >= 100f) {
-                            ConversionStateHolder.updateState(ConversionState.Converting(metadata))
-                            updateNotification(
-                                title = "Extracting Audio",
-                                content = "Processing with FFmpeg...",
-                                progress = 0,
-                                isIndeterminate = true
-                            )
-                        } else {
-                            ConversionStateHolder.updateState(
-                                ConversionState.Downloading(
-                                    progress = progress,
-                                    etaSeconds = eta,
-                                    metadata = metadata
+                            if (!conversionReachedExtraction) {
+                                conversionReachedExtraction = true
+                                ConversionStateHolder.updateState(ConversionState.Converting(metadata))
+                                updateNotification(
+                                    title = "Extracting Audio",
+                                    content = "Processing with FFmpeg...",
+                                    progress = 0,
+                                    isIndeterminate = true
                                 )
-                            )
-                            updateNotification(
-                                title = "Downloading Audio (${progress.toInt()}%)",
-                                content = "${metadata.title} - ETA: ${eta}s",
-                                progress = progress.toInt(),
-                                isIndeterminate = false
-                            )
+                            }
+                        } else {
+                            val progressPercent = progress.toInt().coerceIn(0, 99)
+                            if (shouldPublishProgress(
+                                    progressPercent,
+                                    lastSingleProgressPercent,
+                                    lastSingleProgressAtMs
+                                )
+                            ) {
+                                lastSingleProgressPercent = progressPercent
+                                lastSingleProgressAtMs = SystemClock.elapsedRealtime()
+                                ConversionStateHolder.updateState(
+                                    ConversionState.Downloading(
+                                        progress = progressPercent.toFloat(),
+                                        etaSeconds = eta,
+                                        metadata = metadata
+                                    )
+                                )
+                                updateNotification(
+                                    title = "Downloading Audio ($progressPercent%)",
+                                    content = "${metadata.title} - ETA: ${eta}s",
+                                    progress = progressPercent,
+                                    isIndeterminate = false
+                                )
+                            }
                         }
                     }
                 }
@@ -305,8 +337,11 @@ class ConversionForegroundService : Service() {
                 }
             } finally {
                 cleanupTemp(tempDir)
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                if (generation == conversionGeneration) {
+                    conversionJob = null
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             }
         }
     }
@@ -319,6 +354,11 @@ class ConversionForegroundService : Service() {
         isSpotify: Boolean
     ) {
         conversionJob?.cancel()
+        val generation = ++conversionGeneration
+        lastQueueUiProgressPercent = null
+        lastQueueUiProgressAtMs = 0L
+        lastQueueNotificationProgressPercent = 0
+        lastQueueNotificationProgressAtMs = SystemClock.elapsedRealtime()
 
         val totalCount = tracks.size
         val initialNotification = buildProgressNotification(
@@ -339,9 +379,11 @@ class ConversionForegroundService : Service() {
                 if (!exists()) mkdirs()
             }
 
+            try {
             var completedCount = 0
             var failedCount = 0
             val failedTitles = mutableListOf<String>()
+            var queueProgressNotificationStarted = false
 
             ConversionStateHolder.isCancelled = false
 
@@ -365,25 +407,39 @@ class ConversionForegroundService : Service() {
                     continue
                 }
 
-                ConversionStateHolder.updateState(
-                    ConversionState.QueueRunning(
-                        currentIndex = trackNumber,
-                        totalCount = totalCount,
-                        currentTitle = trackTitle,
-                        progress = 0f,
-                        etaSeconds = 0L,
-                        playlistTitle = playlistTitle,
-                        completedCount = completedCount,
-                        failedCount = failedCount
+                if (shouldPublishProgress(
+                        0,
+                        lastQueueUiProgressPercent,
+                        lastQueueUiProgressAtMs
                     )
-                )
+                ) {
+                    lastQueueUiProgressPercent = 0
+                    lastQueueUiProgressAtMs = SystemClock.elapsedRealtime()
+                    ConversionStateHolder.updateState(
+                        ConversionState.QueueRunning(
+                            currentIndex = trackNumber,
+                            totalCount = totalCount,
+                            currentTitle = trackTitle,
+                            progress = 0f,
+                            etaSeconds = 0L,
+                            playlistTitle = playlistTitle,
+                            completedCount = completedCount,
+                            failedCount = failedCount
+                        )
+                    )
+                }
 
-                updateNotification(
-                    title = "Track $trackNumber of $totalCount: $trackTitle",
-                    content = "Overall: $completedCount/$totalCount done",
-                    progress = ((completedCount.toFloat() / totalCount) * 100).toInt(),
-                    isIndeterminate = true
-                )
+                if (!queueProgressNotificationStarted) {
+                    queueProgressNotificationStarted = true
+                    lastQueueNotificationProgressPercent = 0
+                    lastQueueNotificationProgressAtMs = SystemClock.elapsedRealtime()
+                    updateNotification(
+                        title = "Track $trackNumber of $totalCount: $trackTitle",
+                        content = "Starting track download...",
+                        progress = 0,
+                        isIndeterminate = false
+                    )
+                }
 
                 val processId = UUID.randomUUID().toString()
                 ConversionStateHolder.currentProcessId = processId
@@ -407,26 +463,46 @@ class ConversionForegroundService : Service() {
                         forceSingleVideo = true
                     ) { progress, eta ->
                         if (!ConversionStateHolder.isCancelled) {
-                            ConversionStateHolder.updateState(
-                                ConversionState.QueueRunning(
-                                    currentIndex = trackNumber,
-                                    totalCount = totalCount,
-                                    currentTitle = trackTitle,
-                                    progress = progress,
-                                    etaSeconds = eta,
-                                    playlistTitle = playlistTitle,
-                                    completedCount = completedCount,
-                                    failedCount = failedCount
+                            val progressPercent = progress.toInt().coerceIn(0, 100)
+                            if (shouldPublishProgress(
+                                    progressPercent,
+                                    lastQueueUiProgressPercent,
+                                    lastQueueUiProgressAtMs
                                 )
-                            )
+                            ) {
+                                lastQueueUiProgressPercent = progressPercent
+                                lastQueueUiProgressAtMs = SystemClock.elapsedRealtime()
+                                ConversionStateHolder.updateState(
+                                    ConversionState.QueueRunning(
+                                        currentIndex = trackNumber,
+                                        totalCount = totalCount,
+                                        currentTitle = trackTitle,
+                                        progress = progressPercent.toFloat(),
+                                        etaSeconds = eta,
+                                        playlistTitle = playlistTitle,
+                                        completedCount = completedCount,
+                                        failedCount = failedCount
+                                    )
+                                )
+                            }
 
                             val overallPct = (((completedCount.toFloat() + (progress / 100f)) / totalCount) * 100).toInt()
-                            updateNotification(
-                                title = "Track $trackNumber of $totalCount: $trackTitle",
-                                content = "${progress.toInt()}% • Overall: $completedCount/$totalCount done",
-                                progress = overallPct.coerceIn(0, 100),
-                                isIndeterminate = false
-                            )
+                            val overallProgressPercent = overallPct.coerceIn(0, 100)
+                            if (shouldPublishProgress(
+                                    overallProgressPercent,
+                                    lastQueueNotificationProgressPercent,
+                                    lastQueueNotificationProgressAtMs
+                                )
+                            ) {
+                                lastQueueNotificationProgressPercent = overallProgressPercent
+                                lastQueueNotificationProgressAtMs = SystemClock.elapsedRealtime()
+                                updateNotification(
+                                    title = "Track $trackNumber of $totalCount: $trackTitle",
+                                    content = "$completedCount of $totalCount tracks complete",
+                                    progress = overallProgressPercent,
+                                    isIndeterminate = false
+                                )
+                            }
                         }
                     }
 
@@ -522,9 +598,14 @@ class ConversionForegroundService : Service() {
                 showQueueCompletionNotification(completedCount, failedCount, playlistTitle)
             }
 
-            cleanupTemp(tempDir)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            } finally {
+                cleanupTemp(tempDir)
+                if (generation == conversionGeneration) {
+                    conversionJob = null
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+            }
         }
     }
 
@@ -572,27 +653,60 @@ class ConversionForegroundService : Service() {
 
         try {
             val request = buildRequest(embedMetadata = true, embedThumbnail = true)
-            YoutubeDL.getInstance().execute(request, processId) { progress, eta, _ ->
-                callback(progress, eta)
-            }
+            executeWithDownloadWakeLock(request, processId, callback)
         } catch (e: Exception) {
             if (!ConversionStateHolder.isCancelled) {
                 // Retry without embed-thumbnail in case FFmpeg embedding encounters an issue
                 val retryRequest = buildRequest(embedMetadata = true, embedThumbnail = false)
-                YoutubeDL.getInstance().execute(retryRequest, processId) { progress, eta, _ ->
-                    callback(progress, eta)
-                }
+                executeWithDownloadWakeLock(retryRequest, processId, callback)
             } else {
                 throw e
             }
         }
     }
 
+    private fun executeWithDownloadWakeLock(
+        request: YoutubeDLRequest,
+        processId: String,
+        callback: (Float, Long) -> Unit
+    ) {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "$packageName:ConversionDownload"
+        )?.apply {
+            setReferenceCounted(false)
+        }
+
+        try {
+            wakeLock?.acquire()
+            YoutubeDL.getInstance().execute(request, processId) { progress, eta, _ ->
+                callback(progress, eta)
+            }
+        } finally {
+            if (wakeLock?.isHeld == true) {
+                wakeLock.release()
+            }
+        }
+    }
+
     private fun cancelConversion() {
         ConversionStateHolder.cancel()
+        conversionGeneration += 1
         conversionJob?.cancel()
+        conversionJob = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun shouldPublishProgress(
+        percent: Int,
+        lastPercent: Int?,
+        lastUpdateAtMs: Long
+    ): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        return percent != lastPercent &&
+            (lastUpdateAtMs == 0L || now - lastUpdateAtMs >= PROGRESS_UPDATE_INTERVAL_MS)
     }
 
     private fun promoteToForeground(notification: Notification) {
@@ -740,6 +854,8 @@ class ConversionForegroundService : Service() {
             ).apply {
                 description = getString(R.string.notification_channel_desc)
                 setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -763,6 +879,7 @@ class ConversionForegroundService : Service() {
         const val NOTIFICATION_ID = 1001
         const val NOTIFICATION_COMPLETE_ID = 1002
         const val NOTIFICATION_ERROR_ID = 1003
+        private const val PROGRESS_UPDATE_INTERVAL_MS = 1_000L
 
         const val ACTION_START = "com.linktoaudio.app.action.START"
         const val ACTION_START_QUEUE = "com.linktoaudio.app.action.START_QUEUE"

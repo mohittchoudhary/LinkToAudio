@@ -14,16 +14,21 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.awaitCancellation
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.PlayerController
@@ -39,6 +44,22 @@ fun MiniPlayer(
     val isPlaying by playerController.isPlaying.collectAsState()
     val currentPositionMs by playerController.currentPositionMs.collectAsState()
     val durationMs by playerController.durationMs.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(lifecycleOwner, currentSong != null) {
+        if (currentSong != null) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                playerController.setPositionUpdatesVisible(true)
+                try {
+                    awaitCancellation()
+                } finally {
+                    playerController.setPositionUpdatesVisible(false)
+                }
+            }
+        } else {
+            playerController.setPositionUpdatesVisible(false)
+        }
+    }
 
     AnimatedVisibility(
         visible = currentSong != null,

@@ -175,7 +175,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun observeConversionChanges() {
         viewModelScope.launch {
-            ConversionStateHolder.stateFlow.collect { state ->
+            ConversionStateHolder.stateFlow.drop(1).collect { state ->
                 if (state is ConversionState.Success || state is ConversionState.QueueCompleted) {
                     refreshLibrary()
                 }
@@ -310,22 +310,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteSong(song: Song, onComplete: () -> Unit = {}) {
         viewModelScope.launch(Dispatchers.IO) {
+            var deleted = false
             try {
                 val resolver = getApplication<Application>().contentResolver
                 val uri = Uri.parse(song.contentUri)
-                resolver.delete(uri, null, null)
+                deleted = resolver.delete(uri, null, null) > 0
 
                 if (song.filePath.isNotBlank()) {
                     val file = File(song.filePath)
                     if (file.exists()) {
-                        file.delete()
+                        deleted = file.delete() || deleted
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
             withContext(Dispatchers.Main) {
-                refreshLibrary()
+                if (deleted) {
+                    _allSongs.value = _allSongs.value.filterNot { it.id == song.id }
+                }
                 onComplete()
             }
         }

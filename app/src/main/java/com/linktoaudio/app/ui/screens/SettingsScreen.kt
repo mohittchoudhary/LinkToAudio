@@ -37,12 +37,10 @@ import com.linktoaudio.app.ui.components.LinkConverterSection
 import com.linktoaudio.app.ui.theme.SpotifyGreen
 import com.linktoaudio.app.utils.MediaSaver
 import com.linktoaudio.app.viewmodel.MainViewModel
-import com.linktoaudio.app.viewmodel.MusicViewModel
 
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
-    musicViewModel: MusicViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -86,7 +84,6 @@ fun SettingsScreen(
             val doc = DocumentFile.fromTreeUri(context, treeUri)
             val name = doc?.name ?: "Custom Folder"
             viewModel.setCustomDownloadFolder(treeUri.toString(), name)
-            musicViewModel?.refreshLibrary()
         }
     }
 
@@ -185,7 +182,6 @@ fun SettingsScreen(
                             OutlinedButton(
                                 onClick = {
                                     viewModel.resetCustomDownloadFolder()
-                                    musicViewModel?.refreshLibrary()
                                 },
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -532,7 +528,7 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = "Manage battery restrictions for Mohit Music if your device interrupts downloads or background audio.",
+                    text = "Mohit Music stops all background work when you close the app or when downloads finish.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

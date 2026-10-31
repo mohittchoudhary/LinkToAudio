@@ -26,6 +26,7 @@ import com.linktoaudio.app.player.service.PlaybackService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,6 +87,7 @@ class PlayerController private constructor(private val context: Context) {
     private var sleepTimerJob: Job? = null
     private var sleepAtEndOfTrack: Boolean = false
     private var progressTickerJob: Job? = null
+    private var isPositionUiVisible: Boolean = false
     private var lastRecordedPlaySongId: Long? = null
     private var currentSongPlayTimeMs: Long = 0L
 
@@ -215,10 +217,8 @@ class PlayerController private constructor(private val context: Context) {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
-                if (isPlaying) {
-                    startProgressTicker()
-                } else {
-                    stopProgressTicker()
+                updateProgressTicker()
+                if (!isPlaying) {
                     saveCurrentPosition()
                 }
             }
@@ -291,9 +291,7 @@ class PlayerController private constructor(private val context: Context) {
             _currentQueueIndex.value = controller.currentMediaItemIndex
         }
 
-        if (controller.isPlaying) {
-            startProgressTicker()
-        }
+        updateProgressTicker()
     }
 
     private fun mapMediaItemToSong(mediaItem: MediaItem): Song {
@@ -312,7 +310,7 @@ class PlayerController private constructor(private val context: Context) {
     private fun startProgressTicker() {
         progressTickerJob?.cancel()
         progressTickerJob = scope.launch {
-            while (isActive && _isPlaying.value) {
+            while (isActive && _isPlaying.value && isPositionUiVisible) {
                 val controller = mediaController
                 if (controller != null) {
                     val pos = controller.currentPosition.coerceAtLeast(0L)
@@ -338,6 +336,20 @@ class PlayerController private constructor(private val context: Context) {
     private fun stopProgressTicker() {
         progressTickerJob?.cancel()
         progressTickerJob = null
+    }
+
+    fun setPositionUpdatesVisible(visible: Boolean) {
+        if (isPositionUiVisible == visible) return
+        isPositionUiVisible = visible
+        updateProgressTicker()
+    }
+
+    private fun updateProgressTicker() {
+        if (isPositionUiVisible && _isPlaying.value) {
+            startProgressTicker()
+        } else {
+            stopProgressTicker()
+        }
     }
 
     private fun saveCurrentPosition() {
@@ -546,16 +558,23 @@ class PlayerController private constructor(private val context: Context) {
         _sleepTimerRemainingSec.value = totalSeconds
 
         sleepTimerJob = scope.launch {
-            var remaining = totalSeconds
-            while (isActive && remaining > 0) {
-                delay(1000)
-                remaining -= 1
-                _sleepTimerRemainingSec.value = remaining
-            }
-            if (isActive && remaining <= 0) {
-                pause()
-                _sleepTimerLabel.value = null
-                _sleepTimerRemainingSec.value = null
+            val timerJob = currentCoroutineContext()[Job]
+            try {
+                var remaining = totalSeconds
+                while (isActive && remaining > 0) {
+                    delay(1000)
+                    remaining -= 1
+                    _sleepTimerRemainingSec.value = remaining
+                }
+                if (isActive && remaining <= 0) {
+                    pause()
+                    _sleepTimerLabel.value = null
+                    _sleepTimerRemainingSec.value = null
+                }
+            } finally {
+                if (sleepTimerJob === timerJob) {
+                    sleepTimerJob = null
+                }
             }
         }
     }

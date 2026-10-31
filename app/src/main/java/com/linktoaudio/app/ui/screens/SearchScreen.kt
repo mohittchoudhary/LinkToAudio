@@ -37,6 +37,7 @@ import com.linktoaudio.app.viewmodel.MusicViewModel
 @Composable
 fun SearchScreen(
     musicViewModel: MusicViewModel,
+    onNavigateToLibrary: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -115,8 +116,8 @@ fun SearchScreen(
                         title = "Couldn't load your music",
                         message = libraryError ?: "Check audio access and try again.",
                         icon = Icons.Default.Warning,
-                        actionLabel = "Retry",
-                        onAction = { musicViewModel.refreshLibrary() }
+                        actionLabel = "Open Library",
+                        onAction = onNavigateToLibrary
                     )
                 }
             } else if (recentSearches.isNotEmpty()) {
@@ -228,18 +229,18 @@ fun SearchScreen(
                     title = "Couldn't load your music",
                     message = libraryError ?: "Check audio access and try again.",
                     icon = Icons.Default.Warning,
-                    actionLabel = "Retry",
-                    onAction = { musicViewModel.refreshLibrary() }
+                    actionLabel = "Open Library",
+                    onAction = onNavigateToLibrary
                 )
             }
         } else if (allSongs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ScreenStatePanel(
                     title = "No music to search yet",
-                    message = "Add tracks to your library or refresh the local music scan.",
+                    message = "Open your library to scan for music on this device.",
                     icon = Icons.Default.Search,
-                    actionLabel = "Refresh library",
-                    onAction = { musicViewModel.refreshLibrary() }
+                    actionLabel = "Open Library",
+                    onAction = onNavigateToLibrary
                 )
             }
         } else if (searchSongs.isEmpty() && searchAlbums.isEmpty() && searchArtists.isEmpty() && searchPlaylists.isEmpty()) {

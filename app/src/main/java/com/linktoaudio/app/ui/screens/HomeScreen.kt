@@ -1,9 +1,5 @@
 package com.linktoaudio.app.ui.screens
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +40,9 @@ import java.util.Calendar
 fun HomeScreen(
     musicViewModel: MusicViewModel,
     onNavigateToConverter: () -> Unit = {},
+    onNavigateToLibrary: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val allSongs by musicViewModel.allSongs.collectAsState()
     val recentlyPlayed by musicViewModel.recentlyPlayedSongs.collectAsState()
     val recentlyDownloaded by musicViewModel.recentlyDownloadedSongs.collectAsState()
@@ -55,32 +50,7 @@ fun HomeScreen(
     val favorites by musicViewModel.favoriteSongs.collectAsState()
     val playlists by musicViewModel.playlists.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
-    val hasPermission by musicViewModel.hasStoragePermission.collectAsState()
     val libraryError by musicViewModel.libraryError.collectAsState()
-
-    // Permission check & launcher
-    val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_AUDIO
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        musicViewModel.onPermissionResult(isGranted)
-    }
-
-    LaunchedEffect(Unit) {
-        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        } else {
-            context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        musicViewModel.onPermissionResult(granted)
-        if (!granted) {
-            permissionLauncher.launch(permissionToRequest)
-        }
-    }
 
     // Plain greeting calculation based on time of day
     val greeting = remember {
@@ -160,11 +130,7 @@ fun HomeScreen(
         }
 
         // Empty State or Content
-        if (!hasPermission) {
-            PermissionRequiredCard(
-                onGrantClick = { permissionLauncher.launch(permissionToRequest) }
-            )
-        } else if (isRefreshing && allSongs.isEmpty()) {
+        if (isRefreshing && allSongs.isEmpty()) {
             ScreenStatePanel(
                 title = "Loading your music",
                 message = "Scanning your library…",
@@ -175,8 +141,8 @@ fun HomeScreen(
                 title = "Couldn't load your music",
                 message = libraryError ?: "Check audio access and try again.",
                 icon = Icons.Default.Warning,
-                actionLabel = "Retry",
-                onAction = { musicViewModel.refreshLibrary() }
+                actionLabel = "Open Library",
+                onAction = onNavigateToLibrary
             )
         } else if (allSongs.isEmpty()) {
             EmptyLibraryHomeState(onNavigateToConverter = onNavigateToConverter)
@@ -186,8 +152,8 @@ fun HomeScreen(
                     title = "Library refresh failed",
                     message = libraryError ?: "Some music may be missing.",
                     icon = Icons.Default.Warning,
-                    actionLabel = "Retry",
-                    onAction = { musicViewModel.refreshLibrary() },
+                    actionLabel = "Open Library",
+                    onAction = onNavigateToLibrary,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
@@ -641,60 +607,6 @@ private fun EmptyLibraryHomeState(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )
-        }
-    }
-}
-
-@Composable
-private fun PermissionRequiredCard(
-    onGrantClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.FolderOpen,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(40.dp)
-            )
-
-            Text(
-                text = "Storage access needed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Mohit Music needs permission to scan and play audio files on your device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Button(
-                onClick = onGrantClick,
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SpotifyGreen)
-            ) {
-                Text(
-                    text = "Grant Permission",
-                    color = Color.Black,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }

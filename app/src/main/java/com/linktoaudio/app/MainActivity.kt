@@ -185,16 +185,19 @@ fun MainAppScreen(
                 when (tab) {
                 NavTab.HOME -> HomeScreen(
                     musicViewModel = musicViewModel,
-                    onNavigateToConverter = { selectedTab = NavTab.SETTINGS }
+                    onNavigateToConverter = { selectedTab = NavTab.SETTINGS },
+                    onNavigateToLibrary = { selectedTab = NavTab.LIBRARY }
                 )
                 NavTab.LIBRARY -> LibraryScreen(
                     musicViewModel = musicViewModel,
                     onNavigateToHome = { selectedTab = NavTab.SETTINGS }
                 )
-                NavTab.SEARCH -> SearchScreen(musicViewModel = musicViewModel)
+                NavTab.SEARCH -> SearchScreen(
+                    musicViewModel = musicViewModel,
+                    onNavigateToLibrary = { selectedTab = NavTab.LIBRARY }
+                )
                 NavTab.SETTINGS -> SettingsScreen(
-                    viewModel = viewModel,
-                    musicViewModel = musicViewModel
+                    viewModel = viewModel
                 )
                 }
             }

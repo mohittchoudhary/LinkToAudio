@@ -21,16 +21,22 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.data.SongArtwork
@@ -58,6 +64,49 @@ fun LibraryScreen(
     val playlists by musicViewModel.playlists.collectAsState()
     val favorites by musicViewModel.favorites.collectAsState()
     val recentlyDownloaded by musicViewModel.recentlyDownloadedSongs.collectAsState()
+    val density = LocalDensity.current
+    val pullRefreshThresholdPx = with(density) { 72.dp.toPx() }
+    var pullDistancePx by remember { mutableFloatStateOf(0f) }
+    var pullRefreshTriggered by remember { mutableStateOf(false) }
+
+    val pullRefreshConnection = remember(hasPermission, isRefreshing, pullRefreshThresholdPx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f) {
+                    pullDistancePx = 0f
+                    pullRefreshTriggered = false
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0f && hasPermission && !isRefreshing && !pullRefreshTriggered) {
+                    pullDistancePx = (pullDistancePx + available.y).coerceAtMost(pullRefreshThresholdPx)
+                    if (pullDistancePx >= pullRefreshThresholdPx) {
+                        pullRefreshTriggered = true
+                        musicViewModel.refreshLibrary()
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (!pullRefreshTriggered) pullDistancePx = 0f
+                return Velocity.Zero
+            }
+        }
+    }
+
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) {
+            pullDistancePx = 0f
+            pullRefreshTriggered = false
+        }
+    }
 
     var activeMenuSong by remember { mutableStateOf<Song?>(null) }
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
@@ -95,6 +144,7 @@ fun LibraryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .nestedScroll(pullRefreshConnection)
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Top Library Bar
@@ -146,13 +196,6 @@ fun LibraryScreen(
                     }
                 }
 
-                // Rescan Library Button
-                IconButton(onClick = { musicViewModel.refreshLibrary() }) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Rescan Library"
-                    )
-                }
             }
         }
 
@@ -204,8 +247,9 @@ fun LibraryScreen(
             }
         }
 
-        if (isRefreshing && allSongs.isNotEmpty()) {
+        if ((isRefreshing && allSongs.isNotEmpty()) || pullDistancePx > 0f) {
             LinearProgressIndicator(
+                progress = if (isRefreshing) 1f else (pullDistancePx / pullRefreshThresholdPx).coerceIn(0f, 1f),
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary
             )
