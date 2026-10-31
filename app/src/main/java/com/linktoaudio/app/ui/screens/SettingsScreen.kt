@@ -61,6 +61,7 @@ fun SettingsScreen(
 
     val customDownloadTreeUri by viewModel.customDownloadTreeUri.collectAsState()
     val customDownloadFolderName by viewModel.customDownloadFolderName.collectAsState()
+    val volumeBoostPercent by viewModel.volumeBoostPercent.collectAsState()
 
     val isFolderAccessible = remember(customDownloadTreeUri) {
         if (customDownloadTreeUri.isNullOrBlank()) true
@@ -345,6 +346,63 @@ fun SettingsScreen(
                                 } else null
                             )
                         }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Volume boost slider
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (volumeBoostPercent == 0) Icons.Default.VolumeMute
+                                    else if (volumeBoostPercent <= 100) Icons.Default.VolumeDown
+                                    else Icons.Default.VolumeUp,
+                                contentDescription = null,
+                                tint = if (volumeBoostPercent > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Volume Boost",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        Text(
+                            text = "$volumeBoostPercent%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (volumeBoostPercent > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Slider(
+                        value = volumeBoostPercent.toFloat(),
+                        onValueChange = { viewModel.setVolumeBoostPercent(it.toInt()) },
+                        valueRange = 0f..200f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = if (volumeBoostPercent > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            activeTrackColor = if (volumeBoostPercent > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (volumeBoostPercent > 100) {
+                        Text(
+                            text = "Very high volume may distort sound and can damage hearing or speakers.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }

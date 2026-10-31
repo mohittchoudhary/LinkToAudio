@@ -10,6 +10,7 @@ import com.linktoaudio.app.data.ConversionHistoryManager
 import com.linktoaudio.app.data.ConversionState
 import com.linktoaudio.app.data.ConversionStateHolder
 import com.linktoaudio.app.data.PlaylistInfo
+import com.linktoaudio.app.player.service.PlaybackService
 import com.linktoaudio.app.service.ConversionForegroundService
 import com.linktoaudio.app.utils.ErrorParser
 import com.linktoaudio.app.utils.NetworkUtils
@@ -48,6 +49,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val defaultSleepTimerMinutes = appSettings.defaultSleepTimerMinutesFlow
     val customDownloadTreeUri = appSettings.customDownloadTreeUriFlow
     val customDownloadFolderName = appSettings.customDownloadFolderNameFlow
+    val volumeBoostPercent = appSettings.volumeBoostPercentFlow
 
     private val _playlistPreview = MutableStateFlow<PlaylistInfo?>(null)
     val playlistPreview: StateFlow<PlaylistInfo?> = _playlistPreview.asStateFlow()
@@ -111,6 +113,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDefaultSleepTimerMinutes(minutes: Int) {
         appSettings.defaultSleepTimerMinutes = minutes
+    }
+
+    fun setVolumeBoostPercent(boost: Int) {
+        val clamped = boost.coerceIn(0, 200)
+        appSettings.volumeBoostPercent = clamped
+        PlaybackService.setVolumeBoost(clamped)
     }
 
     fun onPaste(text: String?) {

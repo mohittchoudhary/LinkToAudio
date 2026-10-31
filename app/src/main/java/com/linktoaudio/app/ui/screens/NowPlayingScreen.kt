@@ -55,6 +55,8 @@ fun NowPlayingScreen(
     val playbackSpeed by playerController.playbackSpeed.collectAsState()
     val sleepTimerLabel by playerController.sleepTimerLabel.collectAsState()
     val sleepTimerRemainingSec by playerController.sleepTimerRemainingSec.collectAsState()
+    val volumeBoost by playerController.volumeBoost.collectAsState()
+    val connectedDevice by playerController.connectedAudioDevice.collectAsState()
     val isEqualizerAvailable by musicViewModel.isEqualizerAvailable.collectAsState()
     val favorites by musicViewModel.favorites.collectAsState()
     val playlists by musicViewModel.playlists.collectAsState()
@@ -196,6 +198,15 @@ fun NowPlayingScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    connectedDevice?.let { deviceName ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = deviceName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
 
                 IconButton(onClick = { musicViewModel.toggleFavorite(song) }) {
@@ -320,7 +331,68 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Volume Boost Slider (0 - 200%)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (volumeBoost == 0) Icons.Default.VolumeMute
+                                else if (volumeBoost <= 100) Icons.Default.VolumeDown
+                                else Icons.Default.VolumeUp,
+                            contentDescription = "Volume",
+                            tint = if (volumeBoost > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Volume",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        text = "$volumeBoost%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (volumeBoost > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Slider(
+                    value = volumeBoost.toFloat(),
+                    onValueChange = { playerController.setVolumeBoost(it.toInt()) },
+                    valueRange = 0f..200f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = if (volumeBoost > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        activeTrackColor = if (volumeBoost > 100) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (volumeBoost > 100) {
+                    Text(
+                        text = "Very high volume may distort sound and can damage hearing or speakers.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Secondary Controls: Speed, Sleep Timer, Playlist Add, Equalizer
             Row(

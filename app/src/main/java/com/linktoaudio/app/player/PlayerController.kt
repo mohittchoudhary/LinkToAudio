@@ -2,7 +2,11 @@ package com.linktoaudio.app.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -35,6 +39,8 @@ class PlayerController private constructor(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.Main)
 
     private var mediaController: MediaController? = null
+    private var controllerConnectionPending = false
+    private val pendingControllerActions = mutableListOf<(MediaController) -> Unit>()
 
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
@@ -69,6 +75,14 @@ class PlayerController private constructor(private val context: Context) {
     private val _sleepTimerLabel = MutableStateFlow<String?>(null)
     val sleepTimerLabel: StateFlow<String?> = _sleepTimerLabel.asStateFlow()
 
+    private val appSettings = AppSettings.getInstance(context)
+
+    private val _volumeBoost = MutableStateFlow(appSettings.volumeBoostPercent)
+    val volumeBoost: StateFlow<Int> = _volumeBoost.asStateFlow()
+
+    private val _connectedAudioDevice = MutableStateFlow<String?>(null)
+    val connectedAudioDevice: StateFlow<String?> = _connectedAudioDevice.asStateFlow()
+
     private var sleepTimerJob: Job? = null
     private var sleepAtEndOfTrack: Boolean = false
     private var progressTickerJob: Job? = null
@@ -77,9 +91,74 @@ class PlayerController private constructor(private val context: Context) {
 
     init {
         initializeMediaController()
+        setupAudioDeviceListener()
     }
 
-    private fun initializeMediaController() {
+    private fun setupAudioDeviceListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+            audioManager.registerAudioDeviceCallback(object : AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    updateAudioDevice(audioManager)
+                }
+                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    updateAudioDevice(audioManager)
+                }
+            }, null)
+            updateAudioDevice(audioManager)
+        }
+    }
+
+    private fun updateAudioDevice(audioManager: AudioManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            var found: String? = null
+            for (device in devices) {
+                when (device.type) {
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_BLE_HEADSET,
+                    AudioDeviceInfo.TYPE_BLE_SPEAKER -> {
+                        val name = device.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Bluetooth Audio"
+                        found = "🎧 $name"
+                        break
+                    }
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> {
+                        found = "🎧 Headphones"
+                        break
+                    }
+                    AudioDeviceInfo.TYPE_USB_HEADSET,
+                    AudioDeviceInfo.TYPE_USB_DEVICE -> {
+                        val name = device.productName?.toString()?.takeIf { it.isNotBlank() } ?: "USB Audio"
+                        found = "🎧 $name"
+                        break
+                    }
+                }
+            }
+            _connectedAudioDevice.value = found
+        }
+    }
+
+    fun setVolumeBoost(boost: Int) {
+        val clamped = boost.coerceIn(0, 200)
+        _volumeBoost.value = clamped
+        appSettings.volumeBoostPercent = clamped
+        PlaybackService.setVolumeBoost(clamped)
+    }
+
+    private fun initializeMediaController(onConnected: ((MediaController) -> Unit)? = null) {
+        mediaController?.takeIf { it.isConnected }?.let { connectedController ->
+            onConnected?.invoke(connectedController)
+            return
+        }
+
+        if (onConnected != null) {
+            pendingControllerActions.add(onConnected)
+        }
+        if (controllerConnectionPending) return
+
+        controllerConnectionPending = true
         val sessionToken = SessionToken(
             context,
             ComponentName(context, PlaybackService::class.java)
@@ -92,7 +171,13 @@ class PlayerController private constructor(private val context: Context) {
                 mediaController = controller
                 setupPlayerListener(controller)
                 syncFromController(controller)
+                controllerConnectionPending = false
+                val actions = pendingControllerActions.toList()
+                pendingControllerActions.clear()
+                actions.forEach { action -> action(controller) }
             } catch (e: Exception) {
+                controllerConnectionPending = false
+                pendingControllerActions.clear()
                 e.printStackTrace()
             }
         }, ContextCompat.getMainExecutor(context))
@@ -266,7 +351,18 @@ class PlayerController private constructor(private val context: Context) {
     }
 
     fun playSong(song: Song, newQueue: List<Song> = listOf(song)) {
-        val controller = mediaController ?: return
+        val controller = mediaController
+        if (controller == null || !controller.isConnected) {
+            initializeMediaController { connectedController ->
+                playSongOnController(song, newQueue, connectedController)
+            }
+            return
+        }
+
+        playSongOnController(song, newQueue, controller)
+    }
+
+    private fun playSongOnController(song: Song, newQueue: List<Song>, controller: MediaController) {
 
         // Skip missing files and remove from queue
         if (song.filePath.isNotBlank() && !File(song.filePath).exists()) {
@@ -339,7 +435,29 @@ class PlayerController private constructor(private val context: Context) {
     }
 
     fun togglePlayPause() {
-        val controller = mediaController ?: return
+        val controller = mediaController
+        if (controller == null || !controller.isConnected) {
+            val song = _currentSong.value
+            val queueList = _queue.value
+            if (song != null && queueList.isNotEmpty()) {
+                initializeMediaController { connectedController ->
+                    val startIndex = queueList.indexOfFirst { it.id == song.id }
+                        .takeIf { it >= 0 }
+                        ?: _currentQueueIndex.value.coerceIn(queueList.indices)
+                    connectedController.setMediaItems(
+                        queueList.map { it.toMediaItem() },
+                        startIndex,
+                        _currentPositionMs.value.coerceAtLeast(0L)
+                    )
+                    connectedController.prepare()
+                    connectedController.play()
+                }
+            } else {
+                initializeMediaController()
+            }
+            return
+        }
+
         if (controller.isPlaying) {
             controller.pause()
         } else {
