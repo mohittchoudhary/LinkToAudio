@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,7 @@ import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
 import com.linktoaudio.app.viewmodel.MusicViewModel
+import com.linktoaudio.app.viewmodel.LibraryLoadState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,11 +54,31 @@ fun SearchScreen(
     val allSongs by musicViewModel.allSongs.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
     val libraryError by musicViewModel.libraryError.collectAsState()
+    val libraryLoadState by musicViewModel.libraryLoadState.collectAsState()
 
     var activeMenuSong by remember { mutableStateOf<Song?>(null) }
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
     var selectedArtist by remember { mutableStateOf<Artist?>(null) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
+    var pendingSongMenu by remember { mutableStateOf<Song?>(null) }
+
+    LaunchedEffect(pendingSongMenu, selectedAlbum, selectedArtist, selectedPlaylist) {
+        val song = pendingSongMenu ?: return@LaunchedEffect
+        if (selectedAlbum == null && selectedArtist == null && selectedPlaylist == null) {
+            withFrameNanos { }
+            if (selectedAlbum == null && selectedArtist == null && selectedPlaylist == null) {
+                activeMenuSong = song
+                pendingSongMenu = null
+            }
+        }
+    }
+
+    val openSongMenuFromDetail: (Song) -> Unit = { song ->
+        selectedAlbum = null
+        selectedArtist = null
+        selectedPlaylist = null
+        pendingSongMenu = song
+    }
 
     Column(
         modifier = modifier
@@ -102,7 +124,7 @@ fun SearchScreen(
         }
 
         if (searchQuery.isBlank()) {
-            if (isRefreshing && allSongs.isEmpty()) {
+            if (libraryLoadState == LibraryLoadState.LOADING && allSongs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     ScreenStatePanel(
                         title = "Loading your music",
@@ -110,12 +132,22 @@ fun SearchScreen(
                         isLoading = true
                     )
                 }
-            } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+            } else if (libraryLoadState == LibraryLoadState.ERROR && allSongs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     ScreenStatePanel(
                         title = "Couldn't load your music",
                         message = libraryError ?: "Check audio access and try again.",
                         icon = Icons.Default.Warning,
+                        actionLabel = "Open Library",
+                        onAction = onNavigateToLibrary
+                    )
+                }
+            } else if (libraryLoadState == LibraryLoadState.EMPTY && allSongs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ScreenStatePanel(
+                        title = "Your library is empty",
+                        message = "Download or add music, then try searching again.",
+                        icon = Icons.Default.Search,
                         actionLabel = "Open Library",
                         onAction = onNavigateToLibrary
                     )
@@ -215,7 +247,7 @@ fun SearchScreen(
                     }
                 }
             }
-        } else if (isRefreshing && allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.LOADING && allSongs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ScreenStatePanel(
                     title = "Loading your music",
@@ -223,7 +255,7 @@ fun SearchScreen(
                     isLoading = true
                 )
             }
-        } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.ERROR && allSongs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ScreenStatePanel(
                     title = "Couldn't load your music",
@@ -233,7 +265,7 @@ fun SearchScreen(
                     onAction = onNavigateToLibrary
                 )
             }
-        } else if (allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.EMPTY && allSongs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ScreenStatePanel(
                     title = "No music to search yet",
@@ -469,7 +501,7 @@ fun SearchScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, album.songs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 
@@ -482,7 +514,7 @@ fun SearchScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, artist.songs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 
@@ -496,7 +528,7 @@ fun SearchScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, plSongs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 }

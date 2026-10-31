@@ -168,6 +168,21 @@ class MusicStorageManager private constructor(private val context: Context) {
         }
     }
 
+    suspend fun removeSongReferences(songId: Long) {
+        mutex.withLock {
+            _playlistsFlow.value = _playlistsFlow.value.map { playlist ->
+                playlist.copy(songIds = playlist.songIds.filterNot { it == songId })
+            }
+            _favoritesFlow.value = _favoritesFlow.value - songId
+            _songStatsFlow.value = _songStatsFlow.value - songId
+            if (_lastPlayedSongIdFlow.value == songId) {
+                _lastPlayedSongIdFlow.value = null
+                _lastPlayedPositionFlow.value = 0L
+            }
+            saveToDiskLocked()
+        }
+    }
+
     suspend fun reorderPlaylist(playlistId: String, fromIndex: Int, toIndex: Int) {
         mutex.withLock {
             val list = _playlistsFlow.value.map { pl ->

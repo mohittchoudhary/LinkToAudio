@@ -34,6 +34,7 @@ import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.theme.SpotifyGreen
 import com.linktoaudio.app.viewmodel.MusicViewModel
+import com.linktoaudio.app.viewmodel.LibraryLoadState
 import java.util.Calendar
 
 @Composable
@@ -51,6 +52,7 @@ fun HomeScreen(
     val playlists by musicViewModel.playlists.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
     val libraryError by musicViewModel.libraryError.collectAsState()
+    val libraryLoadState by musicViewModel.libraryLoadState.collectAsState()
 
     // Plain greeting calculation based on time of day
     val greeting = remember {
@@ -130,13 +132,13 @@ fun HomeScreen(
         }
 
         // Empty State or Content
-        if (isRefreshing && allSongs.isEmpty()) {
+        if (libraryLoadState == LibraryLoadState.LOADING && allSongs.isEmpty()) {
             ScreenStatePanel(
                 title = "Loading your music",
                 message = "Scanning your library…",
                 isLoading = true
             )
-        } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.ERROR && allSongs.isEmpty()) {
             ScreenStatePanel(
                 title = "Couldn't load your music",
                 message = libraryError ?: "Check audio access and try again.",
@@ -144,7 +146,7 @@ fun HomeScreen(
                 actionLabel = "Open Library",
                 onAction = onNavigateToLibrary
             )
-        } else if (allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.EMPTY && allSongs.isEmpty()) {
             EmptyLibraryHomeState(onNavigateToConverter = onNavigateToConverter)
         } else {
             if (!libraryError.isNullOrBlank()) {

@@ -1,10 +1,6 @@
 package com.linktoaudio.app.ui.screens
 
-import android.Manifest
 import android.content.Context
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.runtime.withFrameNanos
 import coil.compose.AsyncImage
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.data.SongArtwork
@@ -45,11 +42,13 @@ import com.linktoaudio.app.ui.components.CreatePlaylistDialog
 import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
 import com.linktoaudio.app.viewmodel.MusicViewModel
+import com.linktoaudio.app.viewmodel.LibraryLoadState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     musicViewModel: MusicViewModel,
+    onRequestAudioPermission: () -> Unit = {},
     onNavigateToHome: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -57,6 +56,7 @@ fun LibraryScreen(
     val currentTab by musicViewModel.currentTab.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
     val libraryError by musicViewModel.libraryError.collectAsState()
+    val libraryLoadState by musicViewModel.libraryLoadState.collectAsState()
     val hasPermission by musicViewModel.hasStoragePermission.collectAsState()
     val allSongs by musicViewModel.allSongs.collectAsState()
     val sortOption by musicViewModel.sortOption.collectAsState()
@@ -115,30 +115,29 @@ fun LibraryScreen(
     var selectedFolder by remember { mutableStateOf<Pair<String, List<Song>>?>(null) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
-
-    // Permission launcher
-    val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_AUDIO
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        musicViewModel.onPermissionResult(isGranted)
-    }
+    var pendingSongMenu by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(Unit) {
-        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        } else {
-            context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        musicViewModel.onLibraryOpened()
+    }
+
+    LaunchedEffect(pendingSongMenu, selectedAlbum, selectedArtist, selectedPlaylist, selectedFolder) {
+        val song = pendingSongMenu ?: return@LaunchedEffect
+        if (selectedAlbum == null && selectedArtist == null && selectedPlaylist == null && selectedFolder == null) {
+            withFrameNanos { }
+            if (selectedAlbum == null && selectedArtist == null && selectedPlaylist == null && selectedFolder == null) {
+                activeMenuSong = song
+                pendingSongMenu = null
+            }
         }
-        musicViewModel.onPermissionResult(granted)
-        if (!granted) {
-            permissionLauncher.launch(permissionToRequest)
-        }
+    }
+
+    val openSongMenuFromDetail: (Song) -> Unit = { song ->
+        selectedAlbum = null
+        selectedArtist = null
+        selectedPlaylist = null
+        selectedFolder = null
+        pendingSongMenu = song
     }
 
     Column(
@@ -225,7 +224,7 @@ fun LibraryScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { permissionLauncher.launch(permissionToRequest) },
+                            onClick = onRequestAudioPermission,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -255,7 +254,7 @@ fun LibraryScreen(
             )
         }
 
-        if (hasPermission && isRefreshing && allSongs.isEmpty()) {
+        if (libraryLoadState == LibraryLoadState.LOADING && allSongs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,7 +267,7 @@ fun LibraryScreen(
                     isLoading = true
                 )
             }
-        } else if (hasPermission && !libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.ERROR && allSongs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -283,7 +282,7 @@ fun LibraryScreen(
                     onAction = { musicViewModel.refreshLibrary() }
                 )
             }
-        } else if (hasPermission && !isRefreshing && allSongs.isEmpty()) {
+        } else if (libraryLoadState == LibraryLoadState.EMPTY && allSongs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -520,7 +519,7 @@ fun LibraryScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, album.songs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 
@@ -533,7 +532,7 @@ fun LibraryScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, artist.songs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 
@@ -547,7 +546,7 @@ fun LibraryScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, plSongs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 
@@ -560,7 +559,7 @@ fun LibraryScreen(
             onPlaySong = { song ->
                 musicViewModel.playerController.playSong(song, songs)
             },
-            onSongMenuClick = { activeMenuSong = it }
+            onSongMenuClick = openSongMenuFromDetail
         )
     }
 }

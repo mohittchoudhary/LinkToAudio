@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
 import com.linktoaudio.app.data.AppSettings
@@ -25,7 +26,7 @@ object MediaStoreScanner {
         val appSettings = AppSettings.getInstance(context)
         val customTreeUri = appSettings.customDownloadTreeUri
 
-        val projection = arrayOf(
+        val projection = mutableListOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -36,14 +37,19 @@ object MediaStoreScanner {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.SIZE
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            projection += MediaStore.MediaColumns.RELATIVE_PATH
+            projection += MediaStore.MediaColumns.VOLUME_NAME
+        }
 
+        val projectionArray = projection.toTypedArray()
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= 5000"
         val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
         try {
             val cursor = context.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
+                projectionArray,
                 selection,
                 null,
                 sortOrder
@@ -59,6 +65,8 @@ object MediaStoreScanner {
                 val dateAddedCol = it.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
                 val albumIdCol = it.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
                 val sizeCol = it.getColumnIndex(MediaStore.Audio.Media.SIZE)
+                val relativePathCol = it.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                val volumeNameCol = it.getColumnIndex(MediaStore.MediaColumns.VOLUME_NAME)
 
                 while (it.moveToNext()) {
                     val id = if (idCol >= 0) it.getLong(idCol) else 0L
@@ -70,10 +78,12 @@ object MediaStoreScanner {
                     val dateAdded = if (dateAddedCol >= 0) it.getLong(dateAddedCol) else 0L
                     val albumId = if (albumIdCol >= 0) it.getLong(albumIdCol) else 0L
                     val size = if (sizeCol >= 0) it.getLong(sizeCol) else 0L
+                    val relativePath = if (relativePathCol >= 0) it.getString(relativePathCol).orEmpty() else ""
+                    val volumeName = if (volumeNameCol >= 0) it.getString(volumeNameCol) else null
 
                     // Filter based on setting
                     if (!scanEntireMusicFolder) {
-                        val normalized = filePath.replace("\\", "/")
+                        val normalized = relativePath.ifBlank { filePath }.replace("\\", "/")
                         val isMohitMusic = normalized.contains("Music/Mohit Music", ignoreCase = true) ||
                                 normalized.contains("/Mohit Music/", ignoreCase = true) ||
                                 normalized.contains("Mohit Music", ignoreCase = true)
@@ -101,10 +111,14 @@ object MediaStoreScanner {
                         "Unknown Album"
                     }
 
-                    val contentUri = ContentUris.withAppendedId(
-                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                        id
-                    ).toString()
+                    val mediaCollection = if (
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !volumeName.isNullOrBlank()
+                    ) {
+                        MediaStore.Audio.Media.getContentUri(volumeName)
+                    } else {
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                    }
+                    val contentUri = ContentUris.withAppendedId(mediaCollection, id).toString()
 
                     val albumArtUri = if (albumId > 0) {
                         ContentUris.withAppendedId(
@@ -113,7 +127,9 @@ object MediaStoreScanner {
                         ).toString()
                     } else null
 
-                    val folder = if (filePath.isNotBlank()) {
+                    val folder = if (relativePath.isNotBlank()) {
+                        relativePath.trimEnd('/').substringAfterLast('/').ifEmpty { "Mohit Music" }
+                    } else if (filePath.isNotBlank()) {
                         File(filePath).parentFile?.name.orEmpty().ifEmpty { "Mohit Music" }
                     } else {
                         "Mohit Music"
@@ -138,6 +154,7 @@ object MediaStoreScanner {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            throw e
         }
 
         // Also scan custom download folder (SAF DocumentTree) if selected and accessible
@@ -230,7 +247,7 @@ object MediaStoreScanner {
                                 durationMs = durationMs,
                                 contentUri = uriStr,
                                 albumArtUri = null,
-                                filePath = name,
+                                filePath = "",
                                 dateAdded = file.lastModified() / 1000L,
                                 folder = folderName,
                                 sizeBytes = file.length()

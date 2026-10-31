@@ -3,11 +3,13 @@ package com.linktoaudio.app.viewmodel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.IntentSender
 import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.linktoaudio.app.data.AppSettings
@@ -18,10 +20,15 @@ import com.linktoaudio.app.player.data.MediaStoreScanner
 import com.linktoaudio.app.player.data.MusicStorageManager
 import com.linktoaudio.app.player.model.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+enum class LibraryLoadState { LOADING, LOADED, EMPTY, ERROR }
+
+data class MediaStoreDeleteRequest(val song: Song, val intentSender: IntentSender)
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -31,6 +38,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _libraryLoadState = MutableStateFlow(LibraryLoadState.LOADING)
+    val libraryLoadState: StateFlow<LibraryLoadState> = _libraryLoadState.asStateFlow()
+    private var refreshRequestedAgain = false
 
     private val _libraryError = MutableStateFlow<String?>(null)
     val libraryError: StateFlow<String?> = _libraryError.asStateFlow()
@@ -55,6 +66,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _hasStoragePermission = MutableStateFlow(false)
     val hasStoragePermission: StateFlow<Boolean> = _hasStoragePermission.asStateFlow()
+
+    private val deleteRequestChannel = Channel<MediaStoreDeleteRequest>(Channel.BUFFERED)
+    val deleteRequests = deleteRequestChannel.receiveAsFlow()
 
     val playlists = storageManager.playlistsFlow
     val favorites = storageManager.favoritesFlow
@@ -164,6 +178,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     init {
         checkEqualizerAvailability()
         observeConversionChanges()
+        viewModelScope.launch {
+            playerController.unavailableSongs.collect { song ->
+                removeUnavailableSong(song)
+            }
+        }
+        val hasAudioPermission = hasAudioPermission()
+        _hasStoragePermission.value = hasAudioPermission
+        if (hasAudioPermission) refreshLibrary()
     }
 
     private fun checkEqualizerAvailability() {
@@ -184,10 +206,32 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onPermissionResult(granted: Boolean) {
+        val wasGranted = _hasStoragePermission.value
         _hasStoragePermission.value = granted
-        if (granted) {
+        if (granted && !wasGranted) {
+            refreshLibrary()
+        } else if (!granted && _libraryLoadState.value == LibraryLoadState.LOADING) {
+            _libraryError.value = "Audio access is required to scan your music."
+            _libraryLoadState.value = LibraryLoadState.ERROR
+        }
+    }
+
+    fun onLibraryOpened() {
+        if (_hasStoragePermission.value && !_isRefreshing.value &&
+            _libraryLoadState.value != LibraryLoadState.LOADING
+        ) {
             refreshLibrary()
         }
+    }
+
+    private fun hasAudioPermission(): Boolean {
+        val app = getApplication<Application>()
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        return app.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     fun setTab(tab: LibraryTab) {
@@ -212,23 +256,35 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshLibrary() {
+        if (!_hasStoragePermission.value) return
+        if (_isRefreshing.value) {
+            refreshRequestedAgain = true
+            return
+        }
+        _isRefreshing.value = true
+        _libraryError.value = null
+        if (_allSongs.value.isEmpty()) _libraryLoadState.value = LibraryLoadState.LOADING
         viewModelScope.launch {
-            _isRefreshing.value = true
-            _libraryError.value = null
             try {
                 val songs = MediaStoreScanner.scanAudio(
                     context = getApplication(),
                     scanEntireMusicFolder = appSettings.scanEntireMusicFolder
                 )
                 _allSongs.value = songs
+                _libraryLoadState.value = if (songs.isEmpty()) LibraryLoadState.EMPTY else LibraryLoadState.LOADED
                 playerController.resumeLastPlayed(songs)
             } catch (e: Exception) {
                 e.printStackTrace()
                 _libraryError.value = e.localizedMessage
                     ?.takeIf { it.isNotBlank() }
                     ?: "Couldn't load your music library. Check audio access and try again."
+                _libraryLoadState.value = LibraryLoadState.ERROR
             } finally {
                 _isRefreshing.value = false
+                if (refreshRequestedAgain) {
+                    refreshRequestedAgain = false
+                    refreshLibrary()
+                }
             }
         }
     }
@@ -284,7 +340,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "audio/*"
-                val uri = if (song.filePath.isNotBlank()) {
+                val uri = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && song.filePath.isNotBlank()) {
                     val file = File(song.filePath)
                     if (file.exists()) {
                         FileProvider.getUriForFile(
@@ -309,29 +365,59 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteSong(song: Song, onComplete: () -> Unit = {}) {
-        viewModelScope.launch(Dispatchers.IO) {
-            var deleted = false
+        viewModelScope.launch {
+            val resolver = getApplication<Application>().contentResolver
+            val uri = Uri.parse(song.contentUri)
             try {
-                val resolver = getApplication<Application>().contentResolver
-                val uri = Uri.parse(song.contentUri)
-                deleted = resolver.delete(uri, null, null) > 0
-
-                if (song.filePath.isNotBlank()) {
-                    val file = File(song.filePath)
-                    if (file.exists()) {
-                        deleted = file.delete() || deleted
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY &&
+                    uri.pathSegments.contains("audio")
+                ) {
+                    val request = MediaStore.createDeleteRequest(resolver, listOf(uri))
+                    deleteRequestChannel.send(MediaStoreDeleteRequest(song, request.intentSender))
+                    onComplete()
+                    return@launch
+                }
+                val deleted = withContext(Dispatchers.IO) {
+                    val providerDeleted = runCatching { resolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+                    if (providerDeleted) true else {
+                        val docDeleted = runCatching {
+                            DocumentFile.fromSingleUri(getApplication(), uri)?.delete() == true
+                        }.getOrDefault(false)
+                        if (docDeleted) true else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && song.filePath.isNotBlank()) {
+                            runCatching { File(song.filePath).delete() }.getOrDefault(false)
+                        } else false
                     }
                 }
+                if (deleted) {
+                    removeSongFromLibrary(song)
+                    refreshLibrary()
+                }
+                onComplete()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            withContext(Dispatchers.Main) {
-                if (deleted) {
-                    _allSongs.value = _allSongs.value.filterNot { it.id == song.id }
-                }
-                onComplete()
-            }
         }
+    }
+
+    fun onMediaStoreDeleteResult(song: Song, deleted: Boolean) {
+        if (deleted) viewModelScope.launch {
+            removeSongFromLibrary(song)
+            refreshLibrary()
+        }
+    }
+
+    private suspend fun removeUnavailableSong(song: Song) {
+        removeSongFromLibrary(song)
+    }
+
+    private suspend fun removeSongFromLibrary(song: Song) {
+        _allSongs.value = _allSongs.value.filterNot { it.id == song.id && it.contentUri == song.contentUri }
+        if (_allSongs.value.isEmpty() && _libraryLoadState.value != LibraryLoadState.ERROR) {
+            _libraryLoadState.value = LibraryLoadState.EMPTY
+        }
+        playerController.removeSongFromQueue(song)
+        storageManager.removeSongReferences(song.id)
     }
 
     fun openEqualizer(context: Context) {

@@ -2,14 +2,16 @@ package com.linktoaudio.app.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContentUris
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import java.io.File
+import java.io.FileNotFoundException
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -29,10 +31,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlayerController private constructor(private val context: Context) {
 
@@ -57,6 +62,11 @@ class PlayerController private constructor(private val context: Context) {
 
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
+
+    private val _unavailableSongs = MutableSharedFlow<Song>(extraBufferCapacity = 16)
+    val unavailableSongs = _unavailableSongs.asSharedFlow()
+    private val reportedMissingUris = mutableSetOf<String>()
+    private val reportedAccessErrors = mutableSetOf<String>()
 
     private val _currentQueueIndex = MutableStateFlow(0)
     val currentQueueIndex: StateFlow<Int> = _currentQueueIndex.asStateFlow()
@@ -261,11 +271,15 @@ class PlayerController private constructor(private val context: Context) {
                     if (failedIndex >= 0) {
                         removeFromQueue(failedIndex)
                     }
-                    Toast.makeText(
-                        context,
-                        "Skipping missing or unplayable track: ${failedSong.title}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    if (error.hasCause<FileNotFoundException>()) {
+                        reportUnavailable(failedSong)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "Skipping unplayable track: ${failedSong.title}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         })
@@ -375,21 +389,43 @@ class PlayerController private constructor(private val context: Context) {
     }
 
     private fun playSongOnController(song: Song, newQueue: List<Song>, controller: MediaController) {
-
-        // Skip missing files and remove from queue
-        if (song.filePath.isNotBlank() && !File(song.filePath).exists()) {
-            val validQueue = newQueue.filter { it.id != song.id }
-            _queue.value = validQueue
-            Toast.makeText(
-                context,
-                "File not found on device: ${song.title}",
-                Toast.LENGTH_SHORT
-            ).show()
-            if (validQueue.isNotEmpty()) {
-                playSong(validQueue.first(), validQueue)
-            }
+        val contentUri = resolveContentUri(song)
+        if (contentUri == null) {
+            reportUnavailable(song)
             return
         }
+
+        scope.launch {
+            val readable = withContext(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openFileDescriptor(contentUri, "r")?.use { true } ?: false
+                } catch (_: FileNotFoundException) {
+                    false
+                } catch (_: SecurityException) {
+                    null
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            when (readable) {
+                true -> {
+                    reportedMissingUris.remove(contentUri.toString())
+                    reportedAccessErrors.remove(contentUri.toString())
+                    startSongOnController(song, newQueue, controller)
+                }
+                false -> reportUnavailable(song)
+                null -> if (reportedAccessErrors.add(contentUri.toString())) {
+                    Toast.makeText(context, "Can't access ${song.title}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun startSongOnController(
+        song: Song,
+        newQueue: List<Song>,
+        controller: MediaController
+    ) {
 
         val startIndex = newQueue.indexOfFirst { it.id == song.id }.let { if (it >= 0) it else 0 }
 
@@ -409,7 +445,7 @@ class PlayerController private constructor(private val context: Context) {
             }
         }
 
-        val mediaItems = newQueue.map { it.toMediaItem() }
+        val mediaItems = newQueue.map { queuedSong -> queuedSong.toMediaItem() }
         controller.stop()
         controller.clearMediaItems()
         controller.setMediaItems(mediaItems, startIndex, 0L)
@@ -618,6 +654,57 @@ class PlayerController private constructor(private val context: Context) {
         }
     }
 
+    fun removeSongFromQueue(song: Song) {
+        val controller = mediaController
+        val currentQueue = _queue.value
+        val indices = currentQueue.indices.filter { index ->
+            val queuedSong = currentQueue[index]
+            queuedSong.id == song.id && queuedSong.contentUri == song.contentUri
+        }
+        if (indices.isEmpty()) return
+        indices.asReversed().forEach { index ->
+            if (controller != null && controller.isConnected && index < controller.mediaItemCount) {
+                controller.removeMediaItem(index)
+            }
+        }
+        _queue.value = currentQueue.filterNot {
+            it.id == song.id && it.contentUri == song.contentUri
+        }
+        if (_queue.value.isEmpty()) {
+            _currentSong.value = null
+            _currentQueueIndex.value = 0
+            _isPlaying.value = false
+            _currentPositionMs.value = 0L
+            _durationMs.value = 0L
+        } else if (controller == null || !controller.isConnected) {
+            _currentQueueIndex.value = _currentQueueIndex.value.coerceIn(_queue.value.indices)
+        }
+    }
+
+    private fun reportUnavailable(song: Song) {
+        val uri = resolveContentUri(song)?.toString() ?: song.contentUri
+        if (reportedMissingUris.add(uri)) {
+            Toast.makeText(context, "Song unavailable", Toast.LENGTH_SHORT).show()
+            _unavailableSongs.tryEmit(song)
+        }
+    }
+
+    private fun resolveContentUri(song: Song): Uri? {
+        val storedUri = runCatching { Uri.parse(song.contentUri) }.getOrNull()
+        if (storedUri?.scheme == "content") return storedUri
+        if (song.id <= 0L) return null
+        return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+    }
+
+    private inline fun <reified T : Throwable> Throwable.hasCause(): Boolean {
+        var cause: Throwable? = this
+        while (cause != null) {
+            if (cause is T) return true
+            cause = cause.cause
+        }
+        return false
+    }
+
     fun resumeLastPlayed(allSongs: List<Song>) {
         if (allSongs.isEmpty() || _currentSong.value != null) return
 
@@ -638,6 +725,8 @@ class PlayerController private constructor(private val context: Context) {
     }
 
     private fun Song.toMediaItem(): MediaItem {
+        val songUri = resolveContentUri(this)
+            ?: throw IllegalStateException("Song has no content URI: $title")
         val artBytes = SongArtworkLoader.getEmbeddedOrCachedBytes(context, this)
         val artUri = SongArtworkLoader.getArtworkUri(context, this)
 
@@ -654,9 +743,8 @@ class PlayerController private constructor(private val context: Context) {
             }
             .build()
 
-        return MediaItem.Builder()
+        return MediaItem.fromUri(songUri).buildUpon()
             .setMediaId(id.toString())
-            .setUri(Uri.parse(contentUri))
             .setMediaMetadata(metadata)
             .build()
     }

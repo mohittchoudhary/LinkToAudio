@@ -10,6 +10,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.components.MiniPlayer
 import com.linktoaudio.app.ui.screens.HomeScreen
 import com.linktoaudio.app.ui.screens.LibraryScreen
@@ -37,6 +42,7 @@ import com.linktoaudio.app.ui.screens.SettingsScreen
 import com.linktoaudio.app.ui.theme.LinkToAudioTheme
 import com.linktoaudio.app.viewmodel.MainViewModel
 import com.linktoaudio.app.viewmodel.MusicViewModel
+import kotlinx.coroutines.launch
 
 enum class NavTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
@@ -49,6 +55,23 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val musicViewModel: MusicViewModel by viewModels()
+    private var pendingDeleteSong: Song? = null
+
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        musicViewModel.onPermissionResult(granted)
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private val mediaStoreDeleteLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        pendingDeleteSong?.let { song ->
+            musicViewModel.onMediaStoreDeleteResult(song, result.resultCode == RESULT_OK)
+        }
+        pendingDeleteSong = null
+    }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -59,14 +82,31 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        requestNotificationPermissionIfNeeded()
+        requestAudioPermissionIfNeeded()
         handleIncomingIntent(intent)
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                musicViewModel.deleteRequests.collect { request ->
+                    pendingDeleteSong = request.song
+                    try {
+                        mediaStoreDeleteLauncher.launch(
+                            IntentSenderRequest.Builder(request.intentSender).build()
+                        )
+                    } catch (e: Exception) {
+                        pendingDeleteSong = null
+                        musicViewModel.onMediaStoreDeleteResult(request.song, false)
+                    }
+                }
+            }
+        }
 
         setContent {
             LinkToAudioTheme {
                 MainAppScreen(
                     viewModel = viewModel,
-                    musicViewModel = musicViewModel
+                    musicViewModel = musicViewModel,
+                    onRequestAudioPermission = { requestAudioPermissionIfNeeded() }
                 )
             }
         }
@@ -76,6 +116,34 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        musicViewModel.onPermissionResult(hasAudioPermission())
+    }
+
+    private fun hasAudioPermission(): Boolean {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestAudioPermissionIfNeeded() {
+        if (hasAudioPermission()) {
+            musicViewModel.onPermissionResult(true)
+            requestNotificationPermissionIfNeeded()
+            return
+        }
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        audioPermissionLauncher.launch(permission)
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
@@ -112,7 +180,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(
     viewModel: MainViewModel,
-    musicViewModel: MusicViewModel
+    musicViewModel: MusicViewModel,
+    onRequestAudioPermission: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
     var isNowPlayingOpen by remember { mutableStateOf(false) }
@@ -190,6 +259,7 @@ fun MainAppScreen(
                 )
                 NavTab.LIBRARY -> LibraryScreen(
                     musicViewModel = musicViewModel,
+                    onRequestAudioPermission = onRequestAudioPermission,
                     onNavigateToHome = { selectedTab = NavTab.SETTINGS }
                 )
                 NavTab.SEARCH -> SearchScreen(
