@@ -19,12 +19,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.palette.graphics.Palette
 import com.linktoaudio.app.R
 import com.linktoaudio.app.player.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 object SongArtworkLoader {
 
@@ -36,6 +38,7 @@ object SongArtworkLoader {
             return value.size / 1024
         }
     }
+    private val dominantColorCache = LruCache<String, Int>(128)
 
     private fun getCacheKey(song: Song): String {
         return if (song.contentUri.isNotBlank()) song.contentUri else "song_${song.id}"
@@ -168,6 +171,55 @@ object SongArtworkLoader {
 
         // 6. Null
         null
+    }
+
+    suspend fun getDominantColor(context: Context, song: Song): Int? = withContext(Dispatchers.IO) {
+        val cacheKey = getCacheKey(song)
+        dominantColorCache.get(cacheKey)?.let { return@withContext it }
+
+        val artworkModel = loadArtworkModel(context, song) ?: return@withContext null
+        val artworkBytes = try {
+            when (artworkModel) {
+                is ByteArray -> artworkModel
+                is File -> artworkModel.takeIf { it.isFile }?.readBytes()
+                is Uri -> context.contentResolver.openInputStream(artworkModel)?.use { it.readBytes() }
+                is String -> {
+                    val uri = Uri.parse(artworkModel)
+                    if (uri.scheme.isNullOrBlank()) {
+                        File(artworkModel).takeIf { it.isFile }?.readBytes()
+                    } else {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    }
+                }
+                else -> null
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        } ?: return@withContext null
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(artworkBytes, 0, artworkBytes.size, bounds)
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > 256 || bounds.outHeight / sampleSize > 256) {
+            sampleSize *= 2
+        }
+        val bitmap = BitmapFactory.decodeByteArray(
+            artworkBytes,
+            0,
+            artworkBytes.size,
+            BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        ) ?: return@withContext null
+
+        try {
+            val palette = Palette.from(bitmap).generate()
+            val color = palette.dominantSwatch?.rgb ?: palette.vibrantSwatch?.rgb
+            if (color != null) dominantColorCache.put(cacheKey, color)
+            color
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     /**

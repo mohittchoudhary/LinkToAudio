@@ -1,5 +1,7 @@
 package com.linktoaudio.app.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,20 +20,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import com.linktoaudio.app.R
 import com.linktoaudio.app.player.PlayerController
 import com.linktoaudio.app.player.data.SongArtwork
+import com.linktoaudio.app.player.data.SongArtworkLoader
+import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.player.model.PlayerRepeatMode
 import com.linktoaudio.app.player.model.Song
 import com.linktoaudio.app.ui.components.AddToPlaylistDialog
@@ -79,14 +78,29 @@ fun NowPlayingScreen(
     ) {
         if (song == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "No track playing",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ScreenStatePanel(
+                    title = "No track playing",
+                    message = "Choose a song from your library to start listening.",
+                    actionLabel = "Back to music",
+                    onAction = onCollapse
                 )
             }
             return@Surface
         }
+
+        val artworkDominantColor by produceState<Color?>(
+            initialValue = null,
+            key1 = song.id,
+            key2 = song.contentUri
+        ) {
+            value = SongArtworkLoader.getDominantColor(context, song)?.let { Color(it) }
+        }
+        val baseBackground = MaterialTheme.colorScheme.background
+        val artworkAccent by animateColorAsState(
+            targetValue = artworkDominantColor ?: baseBackground,
+            animationSpec = tween(durationMillis = 220),
+            label = "now_playing_artwork_color"
+        )
 
         val isFav = favorites.contains(song.id)
         val maxDuration = if (durationMs > 0) durationMs.toFloat() else (song.durationMs.coerceAtLeast(1L)).toFloat()
@@ -97,11 +111,15 @@ fun NowPlayingScreen(
                 .fillMaxSize()
                 .background(
                     brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.08f),
-                            MaterialTheme.colorScheme.background
-                        )
+                        colors = if (artworkDominantColor != null) {
+                            listOf(
+                                artworkAccent.copy(alpha = 0.72f),
+                                artworkAccent.copy(alpha = 0.28f),
+                                baseBackground
+                            )
+                        } else {
+                            listOf(baseBackground, baseBackground)
+                        }
                     )
                 )
                 .verticalScroll(rememberScrollState())
@@ -133,7 +151,7 @@ fun NowPlayingScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = song.album.ifEmpty { "LinkToAudio" },
+                        text = song.album.ifEmpty { "Mohit Music" },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -160,7 +178,7 @@ fun NowPlayingScreen(
                     .background(
                         brush = Brush.verticalGradient(
                             listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                artworkAccent.copy(alpha = 0.22f),
                                 MaterialTheme.colorScheme.surfaceVariant
                             )
                         )

@@ -143,7 +143,7 @@ object MediaStoreScanner {
         // Also scan custom download folder (SAF DocumentTree) if selected and accessible
         if (MediaSaver.isTreeUriAccessible(context, customTreeUri)) {
             try {
-                val rootDoc = DocumentFile.fromTreeUri(context, Uri.parse(customTreeUri!!))
+                val rootDoc = DocumentFile.fromTreeUri(context, Uri.parse(customTreeUri.orEmpty()))
                 if (rootDoc != null && rootDoc.exists() && rootDoc.canRead()) {
                     val existingUris = songList.map { it.contentUri }.toSet()
                     val existingKeys = songList.map { it.title.lowercase() to it.sizeBytes }.toSet()

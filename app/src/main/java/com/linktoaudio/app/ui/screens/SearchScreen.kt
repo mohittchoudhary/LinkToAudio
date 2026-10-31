@@ -29,6 +29,7 @@ import com.linktoaudio.app.player.model.Album
 import com.linktoaudio.app.player.model.Artist
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
+import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
 import com.linktoaudio.app.viewmodel.MusicViewModel
 
@@ -48,6 +49,8 @@ fun SearchScreen(
     val favorites by musicViewModel.favorites.collectAsState()
     val playlists by musicViewModel.playlists.collectAsState()
     val allSongs by musicViewModel.allSongs.collectAsState()
+    val isRefreshing by musicViewModel.isRefreshing.collectAsState()
+    val libraryError by musicViewModel.libraryError.collectAsState()
 
     var activeMenuSong by remember { mutableStateOf<Song?>(null) }
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
@@ -93,8 +96,30 @@ fun SearchScreen(
                 .padding(16.dp)
         )
 
+        if (isRefreshing && allSongs.isNotEmpty()) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
         if (searchQuery.isBlank()) {
-            if (recentSearches.isNotEmpty()) {
+            if (isRefreshing && allSongs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ScreenStatePanel(
+                        title = "Loading your music",
+                        message = "Scanning your library…",
+                        isLoading = true
+                    )
+                }
+            } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ScreenStatePanel(
+                        title = "Couldn't load your music",
+                        message = libraryError ?: "Check audio access and try again.",
+                        icon = Icons.Default.Warning,
+                        actionLabel = "Retry",
+                        onAction = { musicViewModel.refreshLibrary() }
+                    )
+                }
+            } else if (recentSearches.isNotEmpty()) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
@@ -188,6 +213,34 @@ fun SearchScreen(
                         )
                     }
                 }
+            }
+        } else if (isRefreshing && allSongs.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ScreenStatePanel(
+                    title = "Loading your music",
+                    message = "Scanning your library…",
+                    isLoading = true
+                )
+            }
+        } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ScreenStatePanel(
+                    title = "Couldn't load your music",
+                    message = libraryError ?: "Check audio access and try again.",
+                    icon = Icons.Default.Warning,
+                    actionLabel = "Retry",
+                    onAction = { musicViewModel.refreshLibrary() }
+                )
+            }
+        } else if (allSongs.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ScreenStatePanel(
+                    title = "No music to search yet",
+                    message = "Add tracks to your library or refresh the local music scan.",
+                    icon = Icons.Default.Search,
+                    actionLabel = "Refresh library",
+                    onAction = { musicViewModel.refreshLibrary() }
+                )
             }
         } else if (searchSongs.isEmpty() && searchAlbums.isEmpty() && searchArtists.isEmpty() && searchPlaylists.isEmpty()) {
             Box(

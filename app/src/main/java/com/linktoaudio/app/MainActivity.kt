@@ -1,5 +1,7 @@
 package com.linktoaudio.app
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -175,7 +177,12 @@ fun MainAppScreen(
                 .padding(innerPadding),
             color = MaterialTheme.colorScheme.background
         ) {
-            when (selectedTab) {
+            Crossfade(
+                targetState = selectedTab,
+                animationSpec = tween(durationMillis = 180),
+                label = "main_tab_transition"
+            ) { tab ->
+                when (tab) {
                 NavTab.HOME -> HomeScreen(
                     musicViewModel = musicViewModel,
                     onNavigateToConverter = { selectedTab = NavTab.SETTINGS }
@@ -189,6 +196,7 @@ fun MainAppScreen(
                     viewModel = viewModel,
                     musicViewModel = musicViewModel
                 )
+                }
             }
         }
     }

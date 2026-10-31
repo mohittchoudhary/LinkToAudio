@@ -342,7 +342,7 @@ fun LinkConverterSection(
                 is ConversionState.Saving -> {
                     ActiveConversionCard(
                         metadata = state.metadata,
-                        stageTitle = "Saving to Music/LinkToAudio...",
+                        stageTitle = "Saving audio...",
                         etaSeconds = null,
                         progress = null,
                         onCancel = { viewModel.cancelConversion() }
@@ -372,14 +372,14 @@ fun LinkConverterSection(
                                 val song = Song(
                                     id = state.item.id.hashCode().toLong(),
                                     title = state.item.title,
-                                    artist = "LinkToAudio",
+                                    artist = "Unknown Artist",
                                     album = "Downloads",
                                     durationMs = state.item.durationSeconds * 1000L,
                                     contentUri = state.item.contentUri ?: Uri.fromFile(File(state.item.filePath)).toString(),
                                     albumArtUri = state.item.thumbnail,
                                     filePath = state.item.filePath,
                                     dateAdded = state.item.timestamp / 1000L,
-                                    folder = "LinkToAudio",
+                                    folder = File(state.item.filePath).parentFile?.name ?: "Mohit Music",
                                     sizeBytes = state.item.fileSize
                                 )
                                 PlayerController.getInstance(context).playSong(song)
@@ -883,7 +883,7 @@ private fun SuccessCard(
     val context = LocalContext.current
 
     LaunchedEffect(item.id) {
-        Toast.makeText(context, "Saved to Music/LinkToAudio", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Audio saved to your download folder.", Toast.LENGTH_LONG).show()
     }
 
     Card(
@@ -961,7 +961,7 @@ private fun SuccessCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                     Text(
-                        text = "Saved in Music/LinkToAudio",
+                        text = "Saved to your download folder",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )

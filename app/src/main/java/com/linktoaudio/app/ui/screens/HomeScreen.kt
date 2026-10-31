@@ -36,6 +36,7 @@ import com.linktoaudio.app.R
 import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.Playlist
 import com.linktoaudio.app.player.model.Song
+import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.theme.SpotifyGreen
 import com.linktoaudio.app.viewmodel.MusicViewModel
 import java.util.Calendar
@@ -55,6 +56,7 @@ fun HomeScreen(
     val playlists by musicViewModel.playlists.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
     val hasPermission by musicViewModel.hasStoragePermission.collectAsState()
+    val libraryError by musicViewModel.libraryError.collectAsState()
 
     // Permission check & launcher
     val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -150,14 +152,46 @@ fun HomeScreen(
             }
         }
 
+        if (isRefreshing && allSongs.isNotEmpty()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
         // Empty State or Content
         if (!hasPermission) {
             PermissionRequiredCard(
                 onGrantClick = { permissionLauncher.launch(permissionToRequest) }
             )
-        } else if (allSongs.isEmpty() && !isRefreshing) {
+        } else if (isRefreshing && allSongs.isEmpty()) {
+            ScreenStatePanel(
+                title = "Loading your music",
+                message = "Scanning your library…",
+                isLoading = true
+            )
+        } else if (!libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+            ScreenStatePanel(
+                title = "Couldn't load your music",
+                message = libraryError ?: "Check audio access and try again.",
+                icon = Icons.Default.Warning,
+                actionLabel = "Retry",
+                onAction = { musicViewModel.refreshLibrary() }
+            )
+        } else if (allSongs.isEmpty()) {
             EmptyLibraryHomeState(onNavigateToConverter = onNavigateToConverter)
         } else {
+            if (!libraryError.isNullOrBlank()) {
+                ScreenStatePanel(
+                    title = "Library refresh failed",
+                    message = libraryError ?: "Some music may be missing.",
+                    icon = Icons.Default.Warning,
+                    actionLabel = "Retry",
+                    onAction = { musicViewModel.refreshLibrary() },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+
             // Quick Picks: 2-column grid of 6 rounded cards
             if (quickPicks.isNotEmpty()) {
                 Text(
@@ -287,7 +321,7 @@ private fun QuickPickCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ),
@@ -305,7 +339,7 @@ private fun QuickPickCard(
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+                .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
             )
 
             Text(
@@ -329,7 +363,7 @@ private fun ShuffleAllCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         ),
@@ -434,7 +468,7 @@ private fun SongSquareCard(
     Column(
         modifier = modifier
             .width(140.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
     ) {
         SongArtwork(
@@ -442,7 +476,7 @@ private fun SongSquareCard(
             contentDescription = song.title,
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(16.dp))
         )
 
         Text(
@@ -643,7 +677,7 @@ private fun PermissionRequiredCard(
             )
 
             Text(
-                text = "LinkToAudio needs permission to scan and play audio files on your device.",
+                text = "Mohit Music needs permission to scan and play audio files on your device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

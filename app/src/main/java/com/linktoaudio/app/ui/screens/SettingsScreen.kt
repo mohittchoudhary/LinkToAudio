@@ -46,6 +46,11 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val appVersionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        }.getOrDefault("Unknown")
+    }
     val autoConvertOnShare by viewModel.autoConvertOnShare.collectAsState()
     val skipAlreadyDownloaded by viewModel.skipAlreadyDownloaded.collectAsState()
     val selectedFormat by viewModel.selectedFormat.collectAsState()
@@ -209,7 +214,7 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
 
-        // Conversion Preferences Card
+        // Conversion and audio preferences
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -221,7 +226,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "Conversion Preferences",
+                    text = "Conversion",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -287,6 +292,22 @@ fun SettingsScreen(
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Equalizer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Audio",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 // Audio Quality Choice
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -504,14 +525,14 @@ fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Background Activity",
+                        text = "Battery",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Text(
-                    text = "Ensure uninterrupted downloads and background audio playback by disabling battery restrictions for LinkToAudio.",
+                    text = "Manage battery restrictions for Mohit Music if your device interrupts downloads or background audio.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -566,7 +587,7 @@ fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Music Player & Library",
+                        text = "Library & playback",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -592,7 +613,7 @@ fun SettingsScreen(
                         FilterChip(
                             selected = !scanEntireMusicFolder,
                             onClick = { viewModel.setScanEntireMusicFolder(false) },
-                            label = { Text("LinkToAudio Only", style = MaterialTheme.typography.labelMedium) },
+                            label = { Text("Mohit Music only", style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = if (!scanEntireMusicFolder) {
                                 {
                                     Icon(
@@ -716,14 +737,14 @@ fun SettingsScreen(
                     }
                 }
 
-                if (!engineUpdateMessage.isNullOrBlank()) {
+                engineUpdateMessage?.takeIf { it.isNotBlank() }?.let { message ->
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = engineUpdateMessage!!,
+                            text = message,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(10.dp)
                         )
@@ -771,7 +792,7 @@ fun SettingsScreen(
                 )
 
                 Text(
-                    text = "• Version: 1.1.0\n" +
+                    text = "• Version: $appVersionName\n" +
                             "• Output folder: Music/Mohit Music (and subfolders for playlists)\n" +
                             "• Universal support: YouTube, Spotify, SoundCloud, Instagram, TikTok, Facebook, Twitter/X, Bandcamp, Vimeo, and more.\n" +
                             "• Architecture: 100% on-device processing via yt-dlp & FFmpeg. No backend server required.\n" +

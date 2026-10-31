@@ -62,7 +62,7 @@ object MediaSaver {
                 try {
                     return saveToDocumentTree(
                         context = context,
-                        treeUriString = customTreeUri!!,
+                        treeUriString = customTreeUri.orEmpty(),
                         tempFile = tempFile,
                         desiredTitle = desiredTitle,
                         format = format,

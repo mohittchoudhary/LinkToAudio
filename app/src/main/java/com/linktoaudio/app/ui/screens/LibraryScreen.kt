@@ -36,6 +36,7 @@ import com.linktoaudio.app.R
 import com.linktoaudio.app.player.data.SongArtwork
 import com.linktoaudio.app.player.model.*
 import com.linktoaudio.app.ui.components.CreatePlaylistDialog
+import com.linktoaudio.app.ui.components.ScreenStatePanel
 import com.linktoaudio.app.ui.components.SongMenuBottomSheet
 import com.linktoaudio.app.viewmodel.MusicViewModel
 
@@ -49,6 +50,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val currentTab by musicViewModel.currentTab.collectAsState()
     val isRefreshing by musicViewModel.isRefreshing.collectAsState()
+    val libraryError by musicViewModel.libraryError.collectAsState()
     val hasPermission by musicViewModel.hasStoragePermission.collectAsState()
     val allSongs by musicViewModel.allSongs.collectAsState()
     val sortOption by musicViewModel.sortOption.collectAsState()
@@ -202,14 +204,42 @@ fun LibraryScreen(
             }
         }
 
-        if (isRefreshing) {
+        if (isRefreshing && allSongs.isNotEmpty()) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary
             )
         }
 
-        if (hasPermission && !isRefreshing && allSongs.isEmpty()) {
+        if (hasPermission && isRefreshing && allSongs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                ScreenStatePanel(
+                    title = "Loading your music",
+                    message = "Scanning your library…",
+                    isLoading = true
+                )
+            }
+        } else if (hasPermission && !libraryError.isNullOrBlank() && allSongs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                ScreenStatePanel(
+                    title = "Couldn't load your music",
+                    message = libraryError ?: "Check audio access and try again.",
+                    icon = Icons.Default.Warning,
+                    actionLabel = "Retry",
+                    onAction = { musicViewModel.refreshLibrary() }
+                )
+            }
+        } else if (hasPermission && !isRefreshing && allSongs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -249,7 +279,18 @@ fun LibraryScreen(
                     }
                 }
             }
-        } else {
+        } else if (hasPermission) {
+
+        if (!libraryError.isNullOrBlank()) {
+            ScreenStatePanel(
+                title = "Library refresh failed",
+                message = libraryError ?: "Some music may be missing.",
+                icon = Icons.Default.Warning,
+                actionLabel = "Retry",
+                onAction = { musicViewModel.refreshLibrary() },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
 
         // Recently Downloaded Horizontal Row (Feature 12)
         if (recentlyDownloaded.isNotEmpty()) {
@@ -277,25 +318,24 @@ fun LibraryScreen(
             }
         }
 
-        // Scrollable Tabs Row (Feature 2)
-        ScrollableTabRow(
-            selectedTabIndex = currentTab.ordinal,
-            edgePadding = 16.dp,
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.primary,
+        // Filter chips keep the library categories compact and easy to scan.
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            LibraryTab.values().forEach { tab ->
-                Tab(
+            items(LibraryTab.values().toList(), key = { it.name }) { tab ->
+                FilterChip(
                     selected = currentTab == tab,
                     onClick = { musicViewModel.setTab(tab) },
-                    text = {
+                    label = {
                         Text(
                             text = tab.title,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal
                         )
-                    }
+                    },
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
         }
@@ -576,8 +616,8 @@ fun SongRowItem(
             song = song,
             contentDescription = song.title,
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
         )
 
         Column(modifier = Modifier.weight(1f)) {

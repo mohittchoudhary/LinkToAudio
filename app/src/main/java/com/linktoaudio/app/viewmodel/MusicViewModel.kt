@@ -32,6 +32,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _libraryError = MutableStateFlow<String?>(null)
+    val libraryError: StateFlow<String?> = _libraryError.asStateFlow()
+
     private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs.asStateFlow()
 
@@ -211,6 +214,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshLibrary() {
         viewModelScope.launch {
             _isRefreshing.value = true
+            _libraryError.value = null
             try {
                 val songs = MediaStoreScanner.scanAudio(
                     context = getApplication(),
@@ -220,6 +224,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 playerController.resumeLastPlayed(songs)
             } catch (e: Exception) {
                 e.printStackTrace()
+                _libraryError.value = e.localizedMessage
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "Couldn't load your music library. Check audio access and try again."
             } finally {
                 _isRefreshing.value = false
             }
